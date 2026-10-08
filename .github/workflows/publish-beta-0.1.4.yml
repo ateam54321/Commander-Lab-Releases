@@ -1,0 +1,64 @@
+name: Publish Commander Lab Beta 0.1.4
+
+# One-time versioned publisher, triggered only when first created.
+# Do not overwrite a published beta or rerun after the signed download expires.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-beta-0.1.4.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-beta-0.1.4
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse to overwrite an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view beta-0.1.4 --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Beta 0.1.4 is already published. Refusing to replace assets."
+            exit 1
+          fi
+
+      - name: Download tested Windows build artifact
+        env:
+          ARTIFACT_URL: "https://sdmntprwestcentralus.oaiusercontent.com/files/00000000-1298-81fb-861b-6fd71335102c/raw?se=2026-10-08T16%3A52%3A15Z&sp=r&sv=2026-02-06&sr=b&scid=fe1f7613-8da9-5c6b-8c6a-c461b9004b30&skoid=2d2fbb03-9efb-4ad0-a91c-1db2f5a47997&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-07T20%3A07%3A38Z&ske=2026-10-08T20%3A07%3A38Z&sks=b&skv=2026-02-06&sig=nFXUv5LN1lrGsBGji5XN8mQ9C0TvjGupn0rR%2BaZznVY%3D"
+        run: |
+          curl -L --fail --show-error --silent --retry 3 "$ARTIFACT_URL" -o CommanderLab-Beta-0.1.4-Windows.zip
+          mkdir release
+          unzip -q CommanderLab-Beta-0.1.4-Windows.zip -d release
+          test -f release/CommanderLab-Beta-0.1.4-Setup.exe
+          test -f release/CommanderLab-Beta-0.1.4-Windows-Portable.zip
+          test -f release/SHA256SUMS.txt
+          test -f release/RELEASE_NOTES.md
+
+      - name: Verify release checksums and independent expected hashes
+        run: |
+          cd release
+          sha256sum -c SHA256SUMS.txt
+          test "$(sha256sum CommanderLab-Beta-0.1.4-Setup.exe | awk '{print $1}')" = "63805b81f75862a2f00adf02c2ef919283ae9b8dc57d43ac0c552d8ecb3c0d63"
+          test "$(sha256sum CommanderLab-Beta-0.1.4-Windows-Portable.zip | awk '{print $1}')" = "7a2ea7e78d1085e04858b4281e7bda9defea6d669d5ac1d733e4393abc2fb193"
+
+      - name: Publish immutable GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create beta-0.1.4 \
+            release/CommanderLab-Beta-0.1.4-Setup.exe \
+            release/CommanderLab-Beta-0.1.4-Windows-Portable.zip \
+            release/SHA256SUMS.txt \
+            release/RELEASE_NOTES.md \
+            --repo "${{ github.repository }}" \
+            --title "Commander Lab Beta 0.1.4" \
+            --notes-file release/RELEASE_NOTES.md \
+            --prerelease
