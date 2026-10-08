@@ -1,0 +1,64 @@
+name: Publish Commander Lab Beta 0.1.2
+
+on:
+  push:
+    paths:
+      - '.release-seed'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download validated private-build artifact
+        env:
+          ARTIFACT_URL: "https://sdmntpreastus.oaiusercontent.com/files/00000000-1858-81f9-bb61-b2d8d761e62b/raw?se=2026-10-08T02%3A01%3A08Z&sp=r&sv=2026-02-06&sr=b&scid=970d8f37-752f-554c-b092-64c06e254354&skoid=c36a4874-d531-4a8d-99fc-7da0d9143d9c&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-07T10%3A24%3A05Z&ske=2026-10-08T10%3A24%3A05Z&sks=b&skv=2026-02-06&sig=XlbsSbuN4eNSoaO6v%2BbWAGRGIky8FvL9dewRSIRaEcA%3D"
+        run: |
+          curl -L --fail --retry 3 "$ARTIFACT_URL" -o CommanderLab-Beta-0.1.2-Windows.zip
+          mkdir release
+          unzip -q CommanderLab-Beta-0.1.2-Windows.zip -d release
+          test -f release/CommanderLab-Beta-0.1.2-Setup.exe
+          test -f release/CommanderLab-Beta-0.1.2-Windows-Portable.zip
+          test -f release/SHA256SUMS.txt
+
+      - name: Verify release hashes
+        run: |
+          cd release
+          sha256sum -c SHA256SUMS.txt
+          test "$(sha256sum CommanderLab-Beta-0.1.2-Setup.exe | awk '{print $1}')" = "c8b5a150b67fe70486d581aefb92ba8eb403e37921b2c162b1d2fe6a64ea26c2"
+          test "$(sha256sum CommanderLab-Beta-0.1.2-Windows-Portable.zip | awk '{print $1}')" = "a32221c265ca834caab7af1a5112989809d0e7bb60f15e8d2c566164ab7c5f56"
+
+      - name: Write public release notes
+        run: |
+          cat > release/PUBLIC_RELEASE_NOTES.md <<'EOF'
+# Commander Lab Beta 0.1.2 — Windows
+
+Beta 0.1.2 is the next installable Windows beta after 0.1.0. Beta 0.1.1 was not published.
+
+## Major changes
+
+- **Native Windows application shell:** normal Commander Lab navigation now opens in its own app window instead of a browser tab/address bar. ChatGPT OAuth still uses the system browser only for secure sign-in.
+- **In-app updates:** Beta 0.1.2 includes the update system for future releases, using this `Commander-Lab-Releases` repository, checksum verification, in-place installer upgrade, and relaunch without manually deleting the old EXE.
+- **Navigation performance work:** ordinary collection/allocation reads no longer rebuild shared SQLite views/schema on every page request, and Decks list queries/art lookups were reduced. Installed-build responsiveness remains under beta validation.
+- **Corrected Collection Leaderboards:** color identities are ranked first by the available collection foundation (mana, core Commander functions, efficiency, balanced capped depth), not raw card count and not an archetype. Then owned commanders inside that identity are ranked, and each commander independently receives its own supported archetype when proven.
+- **Storm over-convergence correction:** a generic Storm-capable card pool no longer automatically labels unrelated commanders as Storm; commander-specific archetype evidence is prioritized before generic shell completeness.
+- **Existing-deck workflow:** imported decks become an immutable `Imported v1` baseline and go directly to audit/upgrades instead of Strategy/Blueprint construction.
+- **Deck file import:** existing decks can be uploaded directly from common text/CSV-style deck-export files or pasted as text.
+
+## Release safety
+
+- No personal collection, Deck Projects, protected allocations, credentials, or preferences are bundled.
+- The Windows packaging pipeline passed release-critical tests, privacy audit, native-shell self-check, packaged-executable clean-start smoke, installer build, and installed-application smoke.
+- This beta is unsigned, so Windows SmartScreen may show an **Unknown Publisher** warning.
+
+Installer SHA-256:
+`c8b5a150b67fe70486d581aefb92ba8eb403e37921b2c162b1d2fe6a64ea26c2`
+EOF
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create beta-0.1.2 release/CommanderLab-Beta-0.1.2-Setup.exe release/CommanderLab-Beta-0.1.2-Windows-Portable.zip release/SHA256SUMS.txt --repo "${{ github.repository }}" --title "Commander Lab Beta 0.1.2" --notes-file release/PUBLIC_RELEASE_NOTES.md --prerelease
