@@ -4,12 +4,14 @@ Public Windows beta releases for **Commander Lab**. The application source code 
 
 ## Latest release
 
-**Commander Lab Beta 0.1** is the first installable Windows beta.
+**Commander Lab Beta 0.1.2** is the current Windows beta.
 
-- Normal Windows installer: `CommanderLab-Beta-0.1.0-Setup.exe`
-- Portable build: `CommanderLab-Beta-0.1.0-Windows-Portable.zip`
+- Normal Windows installer: `CommanderLab-Beta-0.1.2-Setup.exe`
+- Portable build: `CommanderLab-Beta-0.1.2-Windows-Portable.zip`
 - SHA-256 verification file: `SHA256SUMS.txt`
+
+Beta 0.1.2 launches Commander Lab in its own native Windows application window, includes the in-app update system for future releases, improves normal navigation/database behavior, corrects Collection Leaderboard ranking hierarchy, and supports direct existing-deck file upload.
 
 Use the **Releases** section of this repository to download Commander Lab. New installations start clean: personal collections, decks, protected allocations, credentials, and user preferences are not bundled into the release.
 
-Beta 0.1 is currently unsigned, so Windows SmartScreen may show an **Unknown Publisher** warning.
+The beta is currently unsigned, so Windows SmartScreen may show an **Unknown Publisher** warning.
