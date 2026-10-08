@@ -33,30 +33,29 @@ jobs:
       - name: Write public release notes
         run: |
           cat > release/PUBLIC_RELEASE_NOTES.md <<'EOF'
-# Commander Lab Beta 0.1.2 — Windows
-
-Beta 0.1.2 is the next installable Windows beta after 0.1.0. Beta 0.1.1 was not published.
-
-## Major changes
-
-- **Native Windows application shell:** normal Commander Lab navigation now opens in its own app window instead of a browser tab/address bar. ChatGPT OAuth still uses the system browser only for secure sign-in.
-- **In-app updates:** Beta 0.1.2 includes the update system for future releases, using this `Commander-Lab-Releases` repository, checksum verification, in-place installer upgrade, and relaunch without manually deleting the old EXE.
-- **Navigation performance work:** ordinary collection/allocation reads no longer rebuild shared SQLite views/schema on every page request, and Decks list queries/art lookups were reduced. Installed-build responsiveness remains under beta validation.
-- **Corrected Collection Leaderboards:** color identities are ranked first by the available collection foundation (mana, core Commander functions, efficiency, balanced capped depth), not raw card count and not an archetype. Then owned commanders inside that identity are ranked, and each commander independently receives its own supported archetype when proven.
-- **Storm over-convergence correction:** a generic Storm-capable card pool no longer automatically labels unrelated commanders as Storm; commander-specific archetype evidence is prioritized before generic shell completeness.
-- **Existing-deck workflow:** imported decks become an immutable `Imported v1` baseline and go directly to audit/upgrades instead of Strategy/Blueprint construction.
-- **Deck file import:** existing decks can be uploaded directly from common text/CSV-style deck-export files or pasted as text.
-
-## Release safety
-
-- No personal collection, Deck Projects, protected allocations, credentials, or preferences are bundled.
-- The Windows packaging pipeline passed release-critical tests, privacy audit, native-shell self-check, packaged-executable clean-start smoke, installer build, and installed-application smoke.
-- This beta is unsigned, so Windows SmartScreen may show an **Unknown Publisher** warning.
-
-Installer SHA-256:
-`c8b5a150b67fe70486d581aefb92ba8eb403e37921b2c162b1d2fe6a64ea26c2`
-EOF
-
+          # Commander Lab Beta 0.1.2 — Windows
+          
+          Beta 0.1.2 is the next installable Windows beta after 0.1.0. Beta 0.1.1 was not published.
+          
+          ## Major changes
+          
+          - **Native Windows application shell:** normal Commander Lab navigation now opens in its own app window instead of a browser tab/address bar. ChatGPT OAuth still uses the system browser only for secure sign-in.
+          - **In-app updates:** Beta 0.1.2 includes the update system for future releases, using this `Commander-Lab-Releases` repository, checksum verification, in-place installer upgrade, and relaunch without manually deleting the old EXE.
+          - **Navigation performance work:** ordinary collection/allocation reads no longer rebuild shared SQLite views/schema on every page request, and Decks list queries/art lookups were reduced. Installed-build responsiveness remains under beta validation.
+          - **Corrected Collection Leaderboards:** color identities are ranked first by the available collection foundation (mana, core Commander functions, efficiency, balanced capped depth), not raw card count and not an archetype. Then owned commanders inside that identity are ranked, and each commander independently receives its own supported archetype when proven.
+          - **Storm over-convergence correction:** a generic Storm-capable card pool no longer automatically labels unrelated commanders as Storm; commander-specific archetype evidence is prioritized before generic shell completeness.
+          - **Existing-deck workflow:** imported decks become an immutable `Imported v1` baseline and go directly to audit/upgrades instead of Strategy/Blueprint construction.
+          - **Deck file import:** existing decks can be uploaded directly from common text/CSV-style deck-export files or pasted as text.
+          
+          ## Release safety
+          
+          - No personal collection, Deck Projects, protected allocations, credentials, or preferences are bundled.
+          - The Windows packaging pipeline passed release-critical tests, privacy audit, native-shell self-check, packaged-executable clean-start smoke, installer build, and installed-application smoke.
+          - This beta is unsigned, so Windows SmartScreen may show an **Unknown Publisher** warning.
+          
+          Installer SHA-256:
+          `c8b5a150b67fe70486d581aefb92ba8eb403e37921b2c162b1d2fe6a64ea26c2`
+          EOF
       - name: Publish GitHub prerelease
         env:
           GH_TOKEN: ${{ github.token }}
