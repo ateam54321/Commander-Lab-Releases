@@ -1,9 +1,8 @@
 name: Publish Commander Lab Beta 0.1.3
 
+# Historical versioned publisher retained for audit; never rerun on a seed change.
 on:
-  push:
-    paths:
-      - '.release-seed'
+  workflow_dispatch:
 
 permissions:
   contents: write
