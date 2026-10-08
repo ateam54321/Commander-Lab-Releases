@@ -1,0 +1,65 @@
+name: Publish Commander Lab Beta 0.1.5
+
+# One-time publisher for the validated Windows beta built at source commit
+# 484fee2c1c8d69393d68d16363f5bcf3f5872a28 (run 37837401861).
+# Never overwrite an existing release or reuse this artifact link for later builds.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-beta-0.1.5.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-beta-0.1.5
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse to overwrite an existing public beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view beta-0.1.5 --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "beta-0.1.5 is already published; immutable releases must not be overwritten."
+            exit 1
+          fi
+
+      - name: Retrieve tested Windows artifact
+        env:
+          ARTIFACT_URL: "https://sdmntpreastus2.oaiusercontent.com/files/00000000-fe24-81f6-92c9-89b2359b29cf/raw?se=2026-10-08T20%3A21%3A50Z&sp=r&sv=2026-02-06&sr=b&scid=b0ebd37d-7a55-566e-b277-e660db485c89&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-08T15%3A50%3A21Z&ske=2026-10-09T15%3A50%3A21Z&sks=b&skv=2026-02-06&sig=550X9G5EbnspjYh7swF/Dz8cWh06iGHX7qCwpIiQrps%3D"
+        run: |
+          curl -L --fail --show-error --silent --retry 3 "$ARTIFACT_URL" -o CommanderLab-Beta-0.1.5-Windows.zip
+          echo "a72b0151c2fb1a01f626e82a6c60183408ecb0b2caa125f3bac9056773fc6964  CommanderLab-Beta-0.1.5-Windows.zip" | sha256sum -c -
+          mkdir -p release
+          unzip -q CommanderLab-Beta-0.1.5-Windows.zip -d release
+          test -s release/CommanderLab-Beta-0.1.5-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.5-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+
+      - name: Verify individual package checksums
+        run: |
+          cd release
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Publish immutable GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create beta-0.1.5 \
+            release/CommanderLab-Beta-0.1.5-Setup.exe \
+            release/CommanderLab-Beta-0.1.5-Windows-Portable.zip \
+            release/SHA256SUMS.txt \
+            release/RELEASE_NOTES.md \
+            --repo "${{ github.repository }}" \
+            --target main \
+            --title "Commander Lab Beta 0.1.5" \
+            --notes-file release/RELEASE_NOTES.md \
+            --prerelease
