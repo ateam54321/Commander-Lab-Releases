@@ -1,43 +1,13 @@
-name: Publish Commander Lab Beta 0.1
+name: Commander Lab release publisher
 
 on:
-  push:
-    paths:
-      - '.release-seed'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  publish:
+  info:
     runs-on: ubuntu-latest
     steps:
-      - name: Download validated Beta 0.1 artifact
-        env:
-          ARTIFACT_URL: "https://sdmntpreastus2.oaiusercontent.com/files/00000000-2f88-81f6-9f7f-51893d93ae64/raw?se=2026-10-08T00%3A44%3A18Z&sp=r&sv=2026-02-06&sr=b&scid=a1c59aef-8cdb-57c7-80ad-57f3cdf25273&skoid=c36a4874-d531-4a8d-99fc-7da0d9143d9c&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-07T23%3A53%3A27Z&ske=2026-10-08T23%3A53%3A27Z&sks=b&skv=2026-02-06&sig=DjjaLR9qNpskDC6/Un2ugGYZ%2BYVw5n1Q0g/Qb5xB81w%3D"
-        run: |
-          curl -L --fail --retry 3 "$ARTIFACT_URL" -o CommanderLab-Beta-0.1-Windows.zip
-          mkdir release
-          unzip -q CommanderLab-Beta-0.1-Windows.zip -d release
-          test -f release/CommanderLab-Beta-0.1.0-Setup.exe
-          test -f release/CommanderLab-Beta-0.1.0-Windows-Portable.zip
-          test -f release/SHA256SUMS.txt
-          test -f release/RELEASE_NOTES.md
-
-      - name: Verify published hashes before release
-        run: |
-          cd release
-          sha256sum -c SHA256SUMS.txt
-
-      - name: Publish public GitHub prerelease
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create beta-0.1.0 \
-            release/CommanderLab-Beta-0.1.0-Setup.exe \
-            release/CommanderLab-Beta-0.1.0-Windows-Portable.zip \
-            release/SHA256SUMS.txt \
-            --repo "${{ github.repository }}" \
-            --title "Commander Lab Beta 0.1" \
-            --notes-file release/RELEASE_NOTES.md \
-            --prerelease
+      - run: echo "Public release assets are published from validated Commander Lab build artifacts."
