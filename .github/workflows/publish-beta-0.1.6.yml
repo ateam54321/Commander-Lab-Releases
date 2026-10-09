@@ -1,0 +1,88 @@
+name: Publish Commander Lab Beta 0.1.6
+
+# One-time distribution of source run 37950655902's fully validated package.
+# No published 0.1.5 or earlier release/tag/assets are modified.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-beta-0.1.6.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-beta-0.1.6
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse to overwrite any existing Beta 0.1.6 tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view beta-0.1.6 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Beta 0.1.6 already published. Refusing to replace assets."
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.6" >/dev/null 2>&1; then
+            echo "Beta 0.1.6 tag already exists. Refusing overwrite."
+            exit 1
+          fi
+
+      - name: Retrieve Windows package validated in source CI
+        env:
+          ARTIFACT_URL: "https://sdmntprsouthcentralus.oaiusercontent.com/files/00000000-3c70-81f7-bee0-6c686a7c62b5/raw?se=2026-10-09T15%3A42%3A19Z&sp=r&sv=2026-02-06&sr=b&scid=23b9d83e-61a3-59e6-9ac4-43584a82bed6&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-09T11%3A14%3A03Z&ske=2026-10-10T11%3A14%3A03Z&sks=b&skv=2026-02-06&sig=X2c/kZLtQkF9NV89zGNlDnjdMZCgYw3FTKf%2BuRMHphQ%3D"
+        run: |
+          set -euo pipefail
+          curl --location --fail --show-error --silent --retry 3 --max-time 240 "$ARTIFACT_URL" -o CommanderLab-Beta-0.1.6-Windows.zip
+          test -s CommanderLab-Beta-0.1.6-Windows.zip
+          mkdir release
+          unzip -q CommanderLab-Beta-0.1.6-Windows.zip -d release
+          test -s release/CommanderLab-Beta-0.1.6-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.6-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+
+      - name: Verify immutable 0.1.6 binary hashes and internal manifest
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(wc -l < SHA256SUMS.txt)" -eq 2
+          test "$(stat -c %s CommanderLab-Beta-0.1.6-Setup.exe)" -eq 21120678
+          test "$(stat -c %s CommanderLab-Beta-0.1.6-Windows-Portable.zip)" -eq 24309653
+          echo "ec0955a2c8d14cd352de7b8be4915c850e4bb54494bee9feb0299f6f95fafbe7  CommanderLab-Beta-0.1.6-Setup.exe" | sha256sum -c -
+          echo "6c56efe5db490d2eb65089cf7a8da8ac2f0df9e95b022ea22872586410cfefb3  CommanderLab-Beta-0.1.6-Windows-Portable.zip" | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Publish Beta 0.1.6 prerelease to the updater-visible repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.6 \
+            release/CommanderLab-Beta-0.1.6-Setup.exe \
+            release/CommanderLab-Beta-0.1.6-Windows-Portable.zip \
+            release/SHA256SUMS.txt \
+            release/RELEASE_NOTES.md \
+            --repo "$GITHUB_REPOSITORY" \
+            --target main \
+            --title "Commander Lab Beta 0.1.6" \
+            --notes-file release/RELEASE_NOTES.md \
+            --prerelease
+
+      - name: Verify in-app updater can see the published beta assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view beta-0.1.6 --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isPrerelease,assets \
+            --jq '[.tagName, .isPrerelease, ([.assets[].name] | sort)]'
+          gh release view beta-0.1.6 --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name' | grep -Fx 'CommanderLab-Beta-0.1.6-Setup.exe'
+          gh release view beta-0.1.6 --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name' | grep -Fx 'SHA256SUMS.txt'
