@@ -1,0 +1,98 @@
+name: Publish Commander Lab Beta 0.1.13
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.13.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-beta-0.1.13
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse any existing 0.1.13 release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.13 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Beta 0.1.13 release already exists; refusing overwrite" >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.13" >/dev/null 2>&1; then
+            echo "Beta 0.1.13 tag already exists; refusing overwrite" >&2
+            exit 1
+          fi
+      - name: Retrieve exactly Windows-qualified candidate artifact
+        env:
+          ARTIFACT_URL: "https://sdmntprwestus.oaiusercontent.com/files/00000000-50a0-8230-bcfb-412b5ac23eb7/raw?se=2026-10-10T20%3A23%3A50Z&sp=r&sv=2026-02-06&sr=b&scid=9e66b116-43e0-52e0-b6ad-4187bd85c49c&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-09T23%3A06%3A57Z&ske=2026-10-10T23%3A06%3A57Z&sks=b&skv=2026-02-06&sig=dT2Jk3FVxeFANjH2dUlmymDudWHNAzu3K%2BGfVoDja5o%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$ARTIFACT_URL" -o tested-build.zip
+          echo "d758d1816b49a7238c415f6553b0a61aee02a1e496f2ba6a67d61b31d6e48643  tested-build.zip" | sha256sum -c -
+          mkdir release
+          unzip -q tested-build.zip -d release
+          test -s release/CommanderLab-Beta-0.1.13-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.13-Windows-Portable.zip
+          test -s release/RELEASE_NOTES.md
+          test -s release/SHA256SUMS.txt
+      - name: Verify installed-candidate files are byte-for-byte Windows-tested
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.13-Setup.exe)" -eq 21193129
+          test "$(stat -c %s CommanderLab-Beta-0.1.13-Windows-Portable.zip)" -eq 24379706
+          echo "bffe62684619b90bf9d1e872a2ab98b8ba211d82c37cbc5eb3092847376ca4f5  CommanderLab-Beta-0.1.13-Setup.exe" | sha256sum -c -
+          echo "7f092eb4875355df1ce2d48f3ca9d7a702eade4c120d68ab7640219cb979fb9f  CommanderLab-Beta-0.1.13-Windows-Portable.zip" | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+          grep -Fq "Source commit: 779d7bf744d17d5f86169d642e0ac8d7737a88a2" RELEASE_NOTES.md
+      - name: Prepare public release notes
+        run: |
+          cat > release/RELEASE_NOTES.md <<'RELEASENOTES'
+          # Commander Lab Beta 0.1.13 — Deck-Building Brain Quality Update
+          
+          Windows source: `779d7bf744d17d5f86169d642e0ac8d7737a88a2`.
+          Windows candidate run: `38082747503`. The source-qualified Windows runner passed **1,546/1,546 release-critical tests**, packaged executable checks, Windows installer smoke, bundle privacy audit and synthetic existing-profile preservation.
+          
+          ## Improvements to test
+          - Stronger handling of conditional multicolor land-entry risk and final mana-source evidence.
+          - Better selection of truly repeatable card advantage instead of equating it with filtering.
+          - Better close-choice recognition of board-wide hexproof and indestructibility, including restrictions and conditional modes.
+          - More bounded strategy-vs-generic role opportunity costs, improving retention of concentrated game plans.
+          - New post-critic warning if an AI substitution removes evidence for a previously connected strategy dependency path.
+          
+          ## Important limits
+          - This is a new user-testable beta, not proof of stronger play or a measured win rate. Generate a deck from your actual collection and independently review it.
+          - Partial engine evidence is a warning, not a mandatory role count or automatic rollback.
+          - Installation does not change your collection ownership or protected allocations. The preservation test used synthetic existing-profile files; keep normal backups of irreplaceable user data.
+          - No private collections, allocations or credentials are included. The Windows installer is unsigned and may trigger Microsoft SmartScreen.
+          
+          RELEASENOTES
+      - name: Publish updater-visible 0.1.13 prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.13 \
+            release/CommanderLab-Beta-0.1.13-Setup.exe \
+            release/CommanderLab-Beta-0.1.13-Windows-Portable.zip \
+            release/SHA256SUMS.txt \
+            release/RELEASE_NOTES.md \
+            --repo "$GITHUB_REPOSITORY" --target main \
+            --title "Commander Lab Beta 0.1.13 — Deck-Building Brain Quality Update" \
+            --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify release has the updater-required assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.13 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf "%s\n" "$names" | grep -Fx 'CommanderLab-Beta-0.1.13-Setup.exe'
+          printf "%s\n" "$names" | grep -Fx 'CommanderLab-Beta-0.1.13-Windows-Portable.zip'
+          printf "%s\n" "$names" | grep -Fx 'SHA256SUMS.txt'
