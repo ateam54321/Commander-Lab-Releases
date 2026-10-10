@@ -2,15 +2,15 @@
 
 Public Windows beta releases for **Commander Lab**. The application source code is maintained separately in the private development repository.
 
-## Latest release — Beta 0.1.13
+## Latest release — Beta 0.1.14
 
-**[Get Commander Lab Beta 0.1.13](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.13)**
+**[Get Commander Lab Beta 0.1.14](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.14)**
 
-- Windows installer: `CommanderLab-Beta-0.1.13-Setup.exe`
-- Portable Windows app: `CommanderLab-Beta-0.1.13-Windows-Portable.zip`
+- Windows installer: `CommanderLab-Beta-0.1.14-Setup.exe`
+- Portable Windows app: `CommanderLab-Beta-0.1.14-Windows-Portable.zip`
 - Integrity verification: `SHA256SUMS.txt`
 
-Beta 0.1.13 improves repeatable card-advantage selection, broad protection evaluation, strategy-role opportunity cost, conditional mana-land analysis and post-critic engine-path regression diagnostics. The exact Windows candidate passed 1,546 release-critical tests and the packaged-executable, installer and synthetic existing-profile preservation checks. Actual strategy quality still requires user-generated deck trials and independent review.
+Beta 0.1.14 advances multicolor mana/fixing evidence, boardwide protection and cheap removal comparisons, and the Brain's ability to preserve commander-specific fuel and engine-role dependencies through AI refinement. It also includes an opt-in conservative Brain continuation for failed Guided AI review. The exact Windows candidate passed the full release-critical tests, packaged EXE checks, installer and installed-app smoke tests, and synthetic existing-profile preservation checks in [Windows qualification run 38094857282](https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38094857282). Actual strategic deck quality still requires a user-generated deck and independent review.
 
 For an existing installation, use the in-app updater or download the latest installer from the release page. Do not delete your collection or saved decks to update; keeping a normal backup is recommended.
 
