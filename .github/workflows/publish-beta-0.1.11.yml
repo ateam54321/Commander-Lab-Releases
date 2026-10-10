@@ -1,0 +1,67 @@
+name: Publish Commander Lab Beta 0.1.11
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.11.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.11
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse overwriting an existing tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ! gh release view beta-0.1.11 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1
+          ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.11" >/dev/null 2>&1
+      - name: Retrieve exact Windows-tested Beta 0.1.11 artifact from source run 38062886697
+        env:
+          ARTIFACT_URL: "https://sdmntprsouthcentralus.oaiusercontent.com/files/00000000-cff4-81f7-89f7-f77a33a1802b/raw?se=2026-10-10T15%3A28%3A06Z&sp=r&sv=2026-02-06&sr=b&scid=b2de19ab-92d0-59a4-8304-5fbb94003815&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-10T12%3A13%3A34Z&ske=2026-10-11T12%3A13%3A34Z&sks=b&skv=2026-02-06&sig=rcoQ%2BK6N25o3LbPLJF0Ryzb3FHTn%2B2sLmB7omJD7j7w%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$ARTIFACT_URL" -o tested-windows-package.zip
+          echo "84dde9c9040e84e9b25fc69099b5212b2d764addc15e8f36fc9471b83282a6b0  tested-windows-package.zip" | sha256sum -c -
+          mkdir release
+          unzip -q tested-windows-package.zip -d release
+          test -s release/CommanderLab-Beta-0.1.11-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.11-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+      - name: Verify independent installer, portable and checksum hashes
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.11-Setup.exe)" -eq 21158655
+          test "$(stat -c %s CommanderLab-Beta-0.1.11-Windows-Portable.zip)" -eq 24351320
+          echo "206b7eebb0417d9793b00a42caafd4a9eca62c7d6ae46b4d2941eff65b257122  CommanderLab-Beta-0.1.11-Setup.exe" | sha256sum -c -
+          echo "05fe84184ddf80f0afcd5911b689bbba3ee88ff64228f8e96ef7b22651a33025  CommanderLab-Beta-0.1.11-Windows-Portable.zip" | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+          grep -q "Commander Lab Beta 0.1.11" RELEASE_NOTES.md
+      - name: Publish updater-visible Beta 0.1.11 prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.11 \
+            release/CommanderLab-Beta-0.1.11-Setup.exe \
+            release/CommanderLab-Beta-0.1.11-Windows-Portable.zip \
+            release/SHA256SUMS.txt \
+            release/RELEASE_NOTES.md \
+            --repo "$GITHUB_REPOSITORY" --target main \
+            --title "Commander Lab Beta 0.1.11 — Brain Quality Retest" \
+            --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify public installer, portable ZIP and updater checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.11 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf "%s\n" "$names" | grep -Fx 'CommanderLab-Beta-0.1.11-Setup.exe'
+          printf "%s\n" "$names" | grep -Fx 'CommanderLab-Beta-0.1.11-Windows-Portable.zip'
+          printf "%s\n" "$names" | grep -Fx 'SHA256SUMS.txt'
