@@ -52,27 +52,27 @@ jobs:
       - name: Prepare public release notes for Beta 0.1.12
         run: |
           cat > release/RELEASE_NOTES.md <<'NOTES'
-# Commander Lab Beta 0.1.12 — Commander Brain Quality Retest
-
-Windows source: `4f07f9b023c6c327f6e051181962f871173d4849`.
-Windows candidate GitHub Actions run: `38075423848` (release-critical tests, native executable, privacy audit, installation and synthetic existing-profile preservation succeeded).
-
-## Improvements to trial
-
-- More reliable Mardu and multicolor land alternative consideration and post-selection color-source checks.
-- Improved close-choice evaluation of inexpensive spells that directly fuel printed commander casting triggers.
-- Better preservation of cheap commander-synergy candidates before bounded deck-pool selection.
-- More accurate assessment of mana-free interaction and spells with restricted casting windows.
-- Enhanced explainable evidence for nonland selection, interaction, and protection.
-
-## Important limits
-
-- This release is ready for another **user-generated** real-world Commander deck trial and independent review. Automated tests are not measured win rates or proof of strategic quality.
-- Deck lists, saved decks and collection allocations must be reviewed by the user; installation does not automatically reallocate cards.
-- The existing user profile preservation test used synthetic data; always keep normal backups of irreplaceable collections.
-- No private collections, allocation ledgers, credentials, or profile data are bundled.
-- Windows installer is unsigned and can produce a SmartScreen Unknown Publisher warning.
-NOTES
+          # Commander Lab Beta 0.1.12 — Commander Brain Quality Retest
+          
+          Windows source: `4f07f9b023c6c327f6e051181962f871173d4849`.
+          Windows candidate GitHub Actions run: `38075423848` (release-critical tests, native executable, privacy audit, installation and synthetic existing-profile preservation succeeded).
+          
+          ## Improvements to trial
+          
+          - More reliable Mardu and multicolor land alternative consideration and post-selection color-source checks.
+          - Improved close-choice evaluation of inexpensive spells that directly fuel printed commander casting triggers.
+          - Better preservation of cheap commander-synergy candidates before bounded deck-pool selection.
+          - More accurate assessment of mana-free interaction and spells with restricted casting windows.
+          - Enhanced explainable evidence for nonland selection, interaction, and protection.
+          
+          ## Important limits
+          
+          - This release is ready for another **user-generated** real-world Commander deck trial and independent review. Automated tests are not measured win rates or proof of strategic quality.
+          - Deck lists, saved decks and collection allocations must be reviewed by the user; installation does not automatically reallocate cards.
+          - The existing user profile preservation test used synthetic data; always keep normal backups of irreplaceable collections.
+          - No private collections, allocation ledgers, credentials, or profile data are bundled.
+          - Windows installer is unsigned and can produce a SmartScreen Unknown Publisher warning.
+          NOTES
       - name: Publish updater-visible Beta 0.1.12 prerelease
         env:
           GH_TOKEN: ${{ github.token }}
