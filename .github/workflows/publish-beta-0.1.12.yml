@@ -1,0 +1,97 @@
+name: Publish Commander Lab Beta 0.1.12
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.12.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.12
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse overwriting any existing Beta 0.1.12 tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.12 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Beta 0.1.12 public release already exists; refusing to overwrite." >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.12" >/dev/null 2>&1; then
+            echo "Beta 0.1.12 tag already exists; refusing to overwrite." >&2
+            exit 1
+          fi
+      - name: Retrieve exact Windows-qualified artifacts from private build 38075423848
+        env:
+          ARTIFACT_URL: "https://sdmntprcentralus.oaiusercontent.com/files/00000000-64d4-81f5-b404-aa1c1884a4df/raw?se=2026-10-10T18%3A36%3A01Z&sp=r&sv=2026-02-06&sr=b&scid=fe68bbd5-3de2-57f2-89c5-95c18461e0b0&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-09T22%3A58%3A39Z&ske=2026-10-10T22%3A58%3A39Z&sks=b&skv=2026-02-06&sig=byIVGZv2A2Yq064Ey4TmS8U9fGy19MAz3pKc8ayFXC4%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$ARTIFACT_URL" -o qualified-windows-build.zip
+          echo "78c5be354e009b260f445647880e708428a0208a38f92d9e5cb3efc609203c02  qualified-windows-build.zip" | sha256sum -c -
+          mkdir release
+          unzip -q qualified-windows-build.zip -d release
+          test -s release/CommanderLab-Beta-0.1.12-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.12-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+      - name: Verify Windows-tested installer and portable bit-for-bit
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.12-Setup.exe)" -eq 21178072
+          test "$(stat -c %s CommanderLab-Beta-0.1.12-Windows-Portable.zip)" -eq 24365945
+          echo "30ece8c1fce82c7db48e8f98b687bc97e7f1e3a87f94590ae5b69e04663f27d1  CommanderLab-Beta-0.1.12-Setup.exe" | sha256sum -c -
+          echo "f9cd91f85035ed26c6ae8eb0b83b89f9c12a7f5142508e3ae8ddb61dd3e24dd3  CommanderLab-Beta-0.1.12-Windows-Portable.zip" | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+          grep -Fq "Source commit: 4f07f9b023c6c327f6e051181962f871173d4849" RELEASE_NOTES.md
+      - name: Prepare public release notes for Beta 0.1.12
+        run: |
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+# Commander Lab Beta 0.1.12 — Commander Brain Quality Retest
+
+Windows source: `4f07f9b023c6c327f6e051181962f871173d4849`.
+Windows candidate GitHub Actions run: `38075423848` (release-critical tests, native executable, privacy audit, installation and synthetic existing-profile preservation succeeded).
+
+## Improvements to trial
+
+- More reliable Mardu and multicolor land alternative consideration and post-selection color-source checks.
+- Improved close-choice evaluation of inexpensive spells that directly fuel printed commander casting triggers.
+- Better preservation of cheap commander-synergy candidates before bounded deck-pool selection.
+- More accurate assessment of mana-free interaction and spells with restricted casting windows.
+- Enhanced explainable evidence for nonland selection, interaction, and protection.
+
+## Important limits
+
+- This release is ready for another **user-generated** real-world Commander deck trial and independent review. Automated tests are not measured win rates or proof of strategic quality.
+- Deck lists, saved decks and collection allocations must be reviewed by the user; installation does not automatically reallocate cards.
+- The existing user profile preservation test used synthetic data; always keep normal backups of irreplaceable collections.
+- No private collections, allocation ledgers, credentials, or profile data are bundled.
+- Windows installer is unsigned and can produce a SmartScreen Unknown Publisher warning.
+NOTES
+      - name: Publish updater-visible Beta 0.1.12 prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.12 \
+            release/CommanderLab-Beta-0.1.12-Setup.exe \
+            release/CommanderLab-Beta-0.1.12-Windows-Portable.zip \
+            release/SHA256SUMS.txt \
+            release/RELEASE_NOTES.md \
+            --repo "$GITHUB_REPOSITORY" --target main \
+            --title "Commander Lab Beta 0.1.12 — Commander Brain Quality Retest" \
+            --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Confirm updater-visible installer, zip and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.12 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf "%s\n" "$names" | grep -Fx "CommanderLab-Beta-0.1.12-Setup.exe"
+          printf "%s\n" "$names" | grep -Fx "CommanderLab-Beta-0.1.12-Windows-Portable.zip"
+          printf "%s\n" "$names" | grep -Fx "SHA256SUMS.txt"
