@@ -1,0 +1,100 @@
+name: Publish Commander Lab Beta 0.1.14
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.14.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-beta-0.1.14
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse existing beta version release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.14 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Beta 0.1.14 release exists; refusing overwrite." >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.14" >/dev/null 2>&1; then
+            echo "Beta 0.1.14 tag exists; refusing overwrite." >&2
+            exit 1
+          fi
+
+      - name: Download exact Windows-qualified artifact archive
+        env:
+          VERIFIED_ARTIFACT_URL: "https://sdmntprsouthcentralus.oaiusercontent.com/files/00000000-ff4c-81f7-9912-fb13ad535160/raw?se=2026-10-10T23%3A38%3A09Z&sp=r&sv=2026-02-06&sr=b&scid=382ab51c-bd79-5521-90b4-b5605d53b8d2&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-10T15%3A08%3A36Z&ske=2026-10-11T15%3A08%3A36Z&sks=b&skv=2026-02-06&sig=ExK5ukElDrUIfQOnYVt/anEFNXy/NTe2lRYoH7lFhWA%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$VERIFIED_ARTIFACT_URL" -o tested-build.zip
+          echo "e08ef5291f1ca92bd8754538716e0d5298f86e6a96a0bccf534ab4ec7f0702a2  tested-build.zip" | sha256sum -c -
+          mkdir release
+          unzip -q tested-build.zip -d release
+          test -s release/CommanderLab-Beta-0.1.14-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.14-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+
+      - name: Verify exact qualified installer and portable bytes
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.14-Setup.exe)" -eq 21211005
+          test "$(stat -c %s CommanderLab-Beta-0.1.14-Windows-Portable.zip)" -eq 24396819
+          echo "bfc010013a2a0b3b0bb7746f0c4f607c919e777019d56bbab53a04f590566759  CommanderLab-Beta-0.1.14-Setup.exe" | sha256sum -c -
+          echo "49e136308bf5891fe32b9cc7547ffa5fd7b074a1c98025c815145b10c1bde8f1  CommanderLab-Beta-0.1.14-Windows-Portable.zip" | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+          grep -Fq "Source commit: 6240f5ae986b6c8a42d0bf77c57801b6b43bf2d9" RELEASE_NOTES.md
+
+      - name: Write user-facing release notes
+        run: |
+          cat > release/RELEASE_NOTES.md <<'RELEASENOTES'
+          # Commander Lab Beta 0.1.14 — Brain and Deck-Quality Review
+
+          Source commit: 6240f5ae986b6c8a42d0bf77c57801b6b43bf2d9.
+          Windows qualification: GitHub Actions run 38094857282 passed full Windows unit tests and smoke tests, packaged EXE, privacy and GUI checks, installed-app tests and synthetic existing-profile preservation.
+
+          ## Improvements to evaluate
+          - More reliable multicolor fixing, conditional land entry and mana-spending restriction evidence.
+          - Improved candidate retention and evaluation for broad go-wide protection and inexpensive direct creature removal.
+          - More informed AI critic on commander cast-trigger fuel, connected engine paths, single-provider roles and post-refinement strategy-loss evidence.
+          - Guided review has a Brain-only continuation button when AI review cannot proceed. It conservatively completes outstanding close calls while keeping the validated 99; it does NOT duplicate the AI's strategic card swaps.
+
+          ## Suggested Edgar Markov retest
+          - Generate from the actual eligible owned collection with the same low-curve Mardu Vampire combat-swarm plan.
+          - Export the completed 100 cards to ManaBox and independently review mana access, Vampire fuel, protection, interaction, card flow and win conversion.
+          - Confirm installed app, saved projects and ManaBox export on the actual Windows PC.
+
+          ## Limits and safety
+          - This candidate is not a measured win-rate or guarantee of stronger decks.
+          - Installer is unsigned, so Windows SmartScreen may display a warning.
+          - No private collection, allocations, decks or credentials are included. The preservation test uses synthetic pre-existing profile data. Keep normal backups of irreplaceable local files.
+
+          RELEASENOTES
+
+      - name: Publish updater-visible Beta 0.1.14 prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.14 release/CommanderLab-Beta-0.1.14-Setup.exe release/CommanderLab-Beta-0.1.14-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.14 — Brain and Deck-Quality Review" --notes-file release/RELEASE_NOTES.md --prerelease
+
+      - name: Verify updater-required public assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view beta-0.1.14 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$assets" | grep -Fx 'CommanderLab-Beta-0.1.14-Setup.exe'
+          printf '%s\n' "$assets" | grep -Fx 'CommanderLab-Beta-0.1.14-Windows-Portable.zip'
+          printf '%s\n' "$assets" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$assets" | grep -Fx 'RELEASE_NOTES.md'
