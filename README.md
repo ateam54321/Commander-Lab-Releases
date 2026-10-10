@@ -2,15 +2,15 @@
 
 Public Windows beta releases for **Commander Lab**. The application source code is maintained separately in the private development repository.
 
-## Latest release — Beta 0.1.12
+## Latest release — Beta 0.1.13
 
-**[Get Commander Lab Beta 0.1.12](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.12)**
+**[Get Commander Lab Beta 0.1.13](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.13)**
 
-- Windows installer: `CommanderLab-Beta-0.1.12-Setup.exe`
-- Portable Windows app: `CommanderLab-Beta-0.1.12-Windows-Portable.zip`
+- Windows installer: `CommanderLab-Beta-0.1.13-Setup.exe`
+- Portable Windows app: `CommanderLab-Beta-0.1.13-Windows-Portable.zip`
 - Integrity verification: `SHA256SUMS.txt`
 
-Beta 0.1.12 contains improvements to Commander deck-building candidate evaluation, mana source checks, early commander synergy recognition, interaction/protection analysis and diagnostic evidence. It passed the automated Windows packaged-executable, installer and synthetic existing-profile preservation checks. Actual strategy quality still requires user-generated deck trials and independent review.
+Beta 0.1.13 improves repeatable card-advantage selection, broad protection evaluation, strategy-role opportunity cost, conditional mana-land analysis and post-critic engine-path regression diagnostics. The exact Windows candidate passed 1,546 release-critical tests and the packaged-executable, installer and synthetic existing-profile preservation checks. Actual strategy quality still requires user-generated deck trials and independent review.
 
 For an existing installation, use the in-app updater or download the latest installer from the release page. Do not delete your collection or saved decks to update; keeping a normal backup is recommended.
 
