@@ -1,0 +1,97 @@
+name: Publish Commander Lab Beta 0.1.15 — Context and Guided Review Hotfix
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.15.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-beta-0.1.15
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse any prior beta tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.15 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing Beta 0.1.15 release" >&2; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.15" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing Beta 0.1.15 tag" >&2; exit 1
+          fi
+
+      - name: Retrieve exact Windows-qualified candidate artifact
+        env:
+          TESTED_ARCHIVE_URL: "https://sdmntprnortheu.oaiusercontent.com/files/00000000-0498-81f4-8117-272a0fecee81/raw?se=2026-10-12T16%3A25%3A00Z&sp=r&sv=2026-02-06&sr=b&scid=04634ed1-454e-5a0b-920f-6cfe77bf73fa&skoid=78501c7f-f65d-4e8d-9110-bed29e1beb41&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-12T15%3A15%3A50Z&ske=2026-10-13T15%3A15%3A50Z&sks=b&skv=2026-02-06&sig=EJIg%2BdfZhwurLhAyhhO8d5NMUttY3UNxjIPMqCPu6Yc%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$TESTED_ARCHIVE_URL" -o tested-build.zip
+          echo "98ad7e1d45c5b4a196f65716e9a5389a7d467d6501c33592bb06ce9beb50f1a1  tested-build.zip" | sha256sum -c -
+          mkdir release
+          unzip -q tested-build.zip -d release
+          test -s release/CommanderLab-Beta-0.1.15-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.15-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+
+      - name: Verify installer, portable and tested source SHA
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.15-Setup.exe)" -eq 21224350
+          test "$(stat -c %s CommanderLab-Beta-0.1.15-Windows-Portable.zip)" -eq 24410870
+          echo "dc8a1661b0363172e6c1b40bb22e89e6fe5c19a0b681c9cf49b96934a618fe08  CommanderLab-Beta-0.1.15-Setup.exe" | sha256sum -c -
+          echo "d941d606ed53310c3f264a50a8ce987854acf1053af0113106908ca7a0b0e541  CommanderLab-Beta-0.1.15-Windows-Portable.zip" | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+          grep -Fq "Source commit: ff79f9428b0a6251c4f7e9b565ec8419ff272ad4" RELEASE_NOTES.md
+
+      - name: Prepare accurate user release notes
+        run: |
+          cat > release/RELEASE_NOTES.md <<'RELEASENOTES'
+          # Commander Lab Beta 0.1.15 — AI Context and Guided Review Fix
+
+          Windows source: ff79f9428b0a6251c4f7e9b565ec8419ff272ad4.
+          Windows release qualification run 38275916167 passed full unit/smoke tests, Python compilation, GUI executable, privacy audit, native self-check, installer and installed-app smokes, including synthetic existing-profile preservation.
+
+          ## Two fixes for Beta 0.1.14 Edgar testing
+          - **AI context limit:** The bounded deck critic uses focused instructions and a lower initial reasoning effort in ChatGPT-plan mode. An exact context-length failure triggers one additional smaller, evidence-preserving retry, not an endless loop. Other errors are not hidden.
+          - **Guided Step-5/Step-6 contradiction:** Validated Guided swaps no longer silently reopen previously completed Brain/AI card reviews. A new guarded **Restore previously completed review decisions** action appears when a completed Guided review disagrees with the pending ledger. It restores only exact earlier terminal decisions proven by immutable card-event history; genuinely unanswered or changed cards remain pending, and errors do not change the deck or allocations.
+
+          ## If Edgar is blocked after updating
+          - Open the EXISTING Edgar project, do not rebuild or delete it.
+          - If Step 6 offers **Restore previously completed review decisions**, click it once.
+          - If the exact history checks pass, Step 6 can unlock. If the repair refuses an ambiguous history, the existing decision state is preserved. Send the resulting message for investigation.
+          - AI refinement remains optional for exporting the valid deterministic working 100 to ManaBox; future runs test whether the smaller critic fixes the original context error.
+
+          ## Limits and safety
+          - This patch is not proof of a stronger generated deck or a measured win rate.
+          - Installer is unsigned and Windows SmartScreen may warn.
+          - No user's collection, allocations, credentials or saved decks are bundled. The installer safety test uses only synthetic existing-profile files. Keep routine backups of irreplaceable local data.
+
+          RELEASENOTES
+
+      - name: Publish updater-visible Beta 0.1.15
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.15 release/CommanderLab-Beta-0.1.15-Setup.exe release/CommanderLab-Beta-0.1.15-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.15 — AI and Guided Review Hotfix" --notes-file release/RELEASE_NOTES.md --prerelease
+
+      - name: Verify update-required public assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view beta-0.1.15 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$assets" | grep -Fx 'CommanderLab-Beta-0.1.15-Setup.exe'
+          printf '%s\n' "$assets" | grep -Fx 'CommanderLab-Beta-0.1.15-Windows-Portable.zip'
+          printf '%s\n' "$assets" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$assets" | grep -Fx 'RELEASE_NOTES.md'
