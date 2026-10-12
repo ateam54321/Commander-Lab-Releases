@@ -1,0 +1,100 @@
+name: Publish Commander Lab Beta 0.1.16 — Guided Continuation Repair
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.16.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-beta-0.1.16
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse any prior beta tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.16 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing Beta 0.1.16 release" >&2; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.16" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing Beta 0.1.16 tag" >&2; exit 1
+          fi
+
+      - name: Retrieve exact Windows-qualified candidate artifact
+        env:
+          TESTED_ARCHIVE_URL: "https://sdmntprsouthcentralus.oaiusercontent.com/files/00000000-7524-81f7-8d79-927b6d9a9935/raw?se=2026-10-12T20%3A14%3A50Z&sp=r&sv=2026-02-06&sr=b&scid=85be04ff-eb66-5caa-b0f9-5ec4a9fe7d6f&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-11T23%3A16%3A28Z&ske=2026-10-12T23%3A16%3A28Z&sks=b&skv=2026-02-06&sig=BvM4htgdE1pYynPPhYloo9IGVZlvPV9jOXd847xJcWU%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$TESTED_ARCHIVE_URL" -o tested-build.zip
+          echo "a0b60a57d1bf4e9fffccb7a20703bfcf2cbb7863380e948bf37e9a6d443ca30f  tested-build.zip" | sha256sum -c -
+          mkdir release
+          unzip -q tested-build.zip -d release
+          test -s release/CommanderLab-Beta-0.1.16-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.16-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+
+      - name: Verify installer, portable and tested source SHA
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.16-Setup.exe)" -eq 21265293
+          test "$(stat -c %s CommanderLab-Beta-0.1.16-Windows-Portable.zip)" -eq 24451352
+          echo "837a04b8f714f65a459669158a99e9d30f04d0ecfc19ca325aacf7292bdd3334  CommanderLab-Beta-0.1.16-Setup.exe" | sha256sum -c -
+          echo "1a48f8c30f6f4f20acc50748231c25581f29f49505710d4d72bde47a63a28f2e  CommanderLab-Beta-0.1.16-Windows-Portable.zip" | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+          grep -Fq "Source commit: e94372ce9562072e70c3f8dc97b1727b0eca57a0" RELEASE_NOTES.md
+
+      - name: Prepare accurate user release notes
+        run: |
+          cat > release/RELEASE_NOTES.md <<'RELEASENOTES'
+          # Commander Lab Beta 0.1.16 — Guided Deckbuilding Continuation Repair
+
+          Windows application source: ce055233ac040c29a849038c20160fe7127adfde.
+          CI-qualified source: backend run 38299827271 SUCCESS; desktop fast checks run 38299827260 SUCCESS.
+          Windows pinned candidate build: workflow run 38301339793 SUCCESS. Its workflow-trigger SHA was e94372ce9562072e70c3f8dc97b1727b0eca57a0; the build checked out the pinned application source above.
+
+          ## Focus of this hotfix
+          - **Guided card preferences and challengers:** Card suggestions made before Step 5 are preserved as preferences. Commander Lab routes them through the appropriate candidate, draft or collection-check checkpoint rather than treating every choice as a final comparison.
+          - **Next Guided step:** Navigation follows the first incomplete milestone and avoids unnecessary candidate pool rebuilding when an existing valid pool can be reused.
+          - **Later card comparisons:** Guided candidates after the validated 99/collection check continue through the existing bounded Brain/AI comparison rather than silently forcing a card into Edgar.
+          - **No forced inclusion:** A requested card still has to earn its slot. This release does not claim that Bloodthirsty Conqueror must be played in a low-curve Edgar Markov Vampire deck.
+
+          ## Your existing Edgar test
+          - Install Beta 0.1.16 over the existing version and reopen the existing Edgar project. Do not delete or rebuild the project to test this fix.
+          - After any pending card preferences, select Continue Guided. Check that completed strategy, Blueprint, candidate and validated-99 work are retained and that the app advances to the actual next incomplete step.
+          - If AI cannot be configured or a comparison fails, the app should keep your state and surface the blocker. Send the resulting message or decklist for review.
+
+          ## Verification and limitations
+          - The 0.1.16 Windows qualification run passed compilation, unit and smoke tests, packaged GUI-subsystem inspection, clean-bundle audit, native self-check, installer, installed-app launch and synthetic existing-profile preservation.
+          - Unit and packaging checks do not prove the deck is competitively optimal or that every AI provider scenario succeeds.
+          - The Windows installer is unsigned, and SmartScreen might show a warning.
+          - No personal deck data, collection, protected allocations, credentials or authentication files are distributed with the application. Keep routine backups of important local data.
+
+          RELEASENOTES
+
+      - name: Publish updater-visible Beta 0.1.16
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.16 release/CommanderLab-Beta-0.1.16-Setup.exe release/CommanderLab-Beta-0.1.16-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.16 — Guided Continuation Repair" --notes-file release/RELEASE_NOTES.md --prerelease
+
+      - name: Verify update-required public assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view beta-0.1.16 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$assets" | grep -Fx 'CommanderLab-Beta-0.1.16-Setup.exe'
+          printf '%s\n' "$assets" | grep -Fx 'CommanderLab-Beta-0.1.16-Windows-Portable.zip'
+          printf '%s\n' "$assets" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$assets" | grep -Fx 'RELEASE_NOTES.md'
