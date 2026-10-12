@@ -2,15 +2,15 @@
 
 Public Windows beta releases for **Commander Lab**. The application source code is maintained separately in the private development repository.
 
-## Latest release — Beta 0.1.14
+## Latest release — Beta 0.1.15
 
-**[Get Commander Lab Beta 0.1.14](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.14)**
+**[Get Commander Lab Beta 0.1.15](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.15)**
 
-- Windows installer: `CommanderLab-Beta-0.1.14-Setup.exe`
-- Portable Windows app: `CommanderLab-Beta-0.1.14-Windows-Portable.zip`
+- Windows installer: `CommanderLab-Beta-0.1.15-Setup.exe`
+- Portable Windows app: `CommanderLab-Beta-0.1.15-Windows-Portable.zip`
 - Integrity verification: `SHA256SUMS.txt`
 
-Beta 0.1.14 advances multicolor mana/fixing evidence, boardwide protection and cheap removal comparisons, and the Brain's ability to preserve commander-specific fuel and engine-role dependencies through AI refinement. It also includes an opt-in conservative Brain continuation for failed Guided AI review. The exact Windows candidate passed the full release-critical tests, packaged EXE checks, installer and installed-app smoke tests, and synthetic existing-profile preservation checks in [Windows qualification run 38094857282](https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38094857282). Actual strategic deck quality still requires a user-generated deck and independent review.
+Beta 0.1.15 fixes two issues observed during the first real 0.1.14 Edgar test: repeated ChatGPT context-length errors in final AI critique, and a Guided Step 5/Step 6 mismatch where completed reviewed cards could be reopened after validated swaps. The hotfix adds a short-context retry, prevents Guided swap review resets, and provides a user-triggered **Restore previously completed review decisions** action that requires exact prior historical verdicts; it never fabricates approvals or changes protected allocations. The exact Windows-qualified build passed **1,600 tests**, packaged EXE, installer and synthetic existing-profile preservation checks in [run 38275916167](https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38275916167). Final deck strength remains unproven until another user trial.
 
 For an existing installation, use the in-app updater or download the latest installer from the release page. Do not delete your collection or saved decks to update; keeping a normal backup is recommended.
 
