@@ -1,0 +1,94 @@
+name: Publish Commander Lab Beta 0.1.17 — Mana Brain and Guided Repair
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.17.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.17
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse existing release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.17 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Beta 0.1.17 already published — refusing overwrite' >&2; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.17" >/dev/null 2>&1; then
+            echo 'Beta 0.1.17 tag already exists — refusing overwrite' >&2; exit 1
+          fi
+      - name: Retrieve exact Windows-qualified candidate archive
+        env:
+          TESTED_ARCHIVE_URL: "https://sdmntprkoreacentral.oaiusercontent.com/files/00000000-83a4-8206-a540-2ff5c9b81180/raw?se=2026-10-13T14%3A52%3A46Z&sp=r&sv=2026-02-06&sr=b&scid=494ba5d7-6e9b-56e4-8eea-3e33841b7429&skoid=68f37fa7-4e08-478b-93f3-c72d563a0ab3&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-13T12%3A25%3A11Z&ske=2026-10-14T12%3A25%3A11Z&sks=b&skv=2026-02-06&sig=e4bJryQ3VeRUU5OfW5KDfIaIx1b69emzguPRpQyDu4s%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$TESTED_ARCHIVE_URL" -o tested-build.zip
+          echo 'a704184610e6682a781388d4b652ae813d3de24c545fedee08f272924998eea5  tested-build.zip' | sha256sum -c -
+          mkdir release
+          unzip -q tested-build.zip -d release
+          test -s release/CommanderLab-Beta-0.1.17-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.17-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+      - name: Verify tested installer, portable, manifest and pinned source
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.17-Setup.exe)" -eq 21382778
+          test "$(stat -c %s CommanderLab-Beta-0.1.17-Windows-Portable.zip)" -eq 24571080
+          echo '0f6845ac1e6ad1c52b80da0d0a79f199d30c64c8c9ff2a35773f4d920d9644ce  CommanderLab-Beta-0.1.17-Setup.exe' | sha256sum -c -
+          echo '871871d96af861304bea70ef0760950a9557c64cb440ce02c579a93982a389c0  CommanderLab-Beta-0.1.17-Windows-Portable.zip' | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+          grep -Fq 'Source commit: af53e43ebc62c3203cf827a112f61f347a113090' RELEASE_NOTES.md
+      - name: Publish precise release notes
+        run: |
+          cat > release/RELEASE_NOTES.md <<'RELEASENOTES'
+          # Commander Lab Beta 0.1.17 — Mana Brain and Guided Safety
+          
+          Exact packaged application source: `af53e43ebc62c3203cf827a112f61f347a113090`.
+          Private pinned Windows package workflow: `38415055284` — SUCCESS.
+          Linux backend regression run: `38414588523` — SUCCESS.
+          Desktop fast checks run: `38414588948` — SUCCESS.
+          Native Windows full release-critical test and smoke workflow: `38414589063` — SUCCESS (1,772 tests).
+          
+          ## Improvements
+          - Mana-base evaluation now distinguishes selectable land faces, spell-front MDFCs, conditional entries, shock/fastland modes, restricted creature-type mana, and reachable fetch routes without overstating castability.
+          - After selecting the spell package, the bounded optimizer considers legal owned, unallocated mana improvements beyond the strategic card pool while preserving explicit decisions, protected allocations, commander legality and exact 99.
+          - After AI refinement or a Guided challenger, final mana is checked again. Invalid or out-of-scope critic proposals restore the validated Brain-built 99 rather than silently corrupting the deck or review ledger.
+          - Guided keeps the current validated 99 when a proposed automatic swap lacks an exact safe target or proof, without restarting an already-completed candidate pool.
+          - Additional Windows SQLite connection-lifetime cleanup prevents temporary collection/reference file locks in native tests and read-only ManaBox auditing.
+          
+          ## Updating and limitations
+          - Install or use the in-app updater to move from Beta 0.1.16 to 0.1.17. Existing local collection and saved project state should be preserved; back up important local data as usual.
+          - Native packaged launch/install and synthetic pre-existing profile preservation passed. Windows installer is unsigned and may show a SmartScreen Unknown Publisher warning.
+          - The release package contains no personal collection, protected allocation file, deck-project history, credentials, or local user settings.
+          - Exact early-turn color probabilities, played mana sequencing, and competitive deck strength are NOT proven by the heuristic optimizer or CI. Full real-owned Edgar and second-multicolor Windows deck-acceptance sessions have not been independently completed for this build.
+          
+          RELEASENOTES
+      - name: Publish updater-visible Beta 0.1.17
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.17 release/CommanderLab-Beta-0.1.17-Setup.exe release/CommanderLab-Beta-0.1.17-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title 'Commander Lab Beta 0.1.17 — Mana Brain and Guided Safety' --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify public assets and exact SHA256
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view beta-0.1.17 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$assets" | grep -Fx 'CommanderLab-Beta-0.1.17-Setup.exe'
+          printf '%s\n' "$assets" | grep -Fx 'CommanderLab-Beta-0.1.17-Windows-Portable.zip'
+          printf '%s\n' "$assets" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$assets" | grep -Fx 'RELEASE_NOTES.md'
+          mkdir -p verified
+          gh release download beta-0.1.17 -p 'CommanderLab-Beta-0.1.17-Setup.exe' -p 'CommanderLab-Beta-0.1.17-Windows-Portable.zip' -p 'SHA256SUMS.txt' -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
