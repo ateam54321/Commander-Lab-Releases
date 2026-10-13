@@ -1,0 +1,94 @@
+name: Publish Commander Lab Beta 0.1.18 — Verified Windows Update
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.18.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.18
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse already published version or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.18 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Beta 0.1.18 already exists; refusing overwrite" >&2; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.18" >/dev/null 2>&1; then
+            echo "Beta 0.1.18 tag already exists; refusing overwrite" >&2; exit 1
+          fi
+      - name: Retrieve exact already-qualified Windows package
+        env:
+          VERIFIED_ARCHIVE_URL: "https://sdmntprcentralus.oaiusercontent.com/files/00000000-072c-81f5-bf07-4bb6a3cde7fb/raw?se=2026-10-13T18%3A41%3A59Z&sp=r&sv=2026-02-06&sr=b&scid=a2a38833-f6a8-51bf-9458-4dde0d0eb7fb&skoid=9b9c502c-68d7-438f-bea0-600feb684c90&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-13T12%3A34%3A12Z&ske=2026-10-14T12%3A34%3A12Z&sks=b&skv=2026-02-06&sig=DJTEuQhbGZJpI3bIDBbD/p7cDoPXiro9Js3D3qVx7cM%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$VERIFIED_ARCHIVE_URL" -o verified-artifact.zip
+          echo "0416c37d488277340b1f516342f6d9462428ea0c24bc6923921012f6a05c0b4b  verified-artifact.zip" | sha256sum -c -
+          mkdir -p release
+          unzip -q verified-artifact.zip -d release
+          test -s release/CommanderLab-Beta-0.1.18-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.18-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+      - name: Verify exact binaries, manifest, and source identity
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.18-Setup.exe)" -eq 21404811
+          test "$(stat -c %s CommanderLab-Beta-0.1.18-Windows-Portable.zip)" -eq 24590642
+          echo "b35b295b3f3d9f5af551418de7ba3902caed68729acaba7613f37e4c50c1596f  CommanderLab-Beta-0.1.18-Setup.exe" | sha256sum -c -
+          echo "9405af87e75eed34c34b481eac5bfbf7042757be78d4eb42cfcb27605140e06e  CommanderLab-Beta-0.1.18-Windows-Portable.zip" | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+          grep -Fq "Source commit: 084e05112f78efd5123bfc8b42134af14a1466cb" RELEASE_NOTES.md
+      - name: Write tested Beta 0.1.18 release notes
+        run: |
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          # Commander Lab Beta 0.1.18 — Brain Candidate Selection Update
+
+          Packaged application source: `084e05112f78efd5123bfc8b42134af14a1466cb`.
+
+          - Exact Windows package: [verified packaging run](https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38445821755) — SUCCESS.
+          - Windows release-critical checks including installed-app preservation — SUCCESS.
+          - Desktop fast checks and backend checks — SUCCESS.
+
+          ## Changes
+          - Improved verified card retrieval for commander protection, flexible interaction and card access.
+          - More accurate front-face double-faced card evidence and basic mana support.
+          - Exact low-slot engine package construction and protection of reserved engine pieces.
+          - Better diagnostics when comparing candidate cards against the selected 99.
+          - Bounded final selection preferences for previously uncovered interaction types.
+
+          ## Updating and limitations
+          - The in-app updater can offer Beta 0.1.18 after this release becomes visible.
+          - Install directly with the Windows Setup asset if your existing app is not detecting the release.
+          - Windows installer is unsigned and may trigger a SmartScreen warning.
+          - This build contains no personal user collection, saved projects, credentials, or allocations.
+          - Passing automated release checks does not establish optimized deck power or win rate.
+          NOTES
+      - name: Publish updater-visible Beta 0.1.18
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.18 release/CommanderLab-Beta-0.1.18-Setup.exe release/CommanderLab-Beta-0.1.18-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.18 — Brain Candidate Selection Update" --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify publicly downloadable release hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view beta-0.1.18 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$assets" | grep -Fx "CommanderLab-Beta-0.1.18-Setup.exe"
+          printf '%s\n' "$assets" | grep -Fx "CommanderLab-Beta-0.1.18-Windows-Portable.zip"
+          printf '%s\n' "$assets" | grep -Fx "SHA256SUMS.txt"
+          printf '%s\n' "$assets" | grep -Fx "RELEASE_NOTES.md"
+          mkdir -p verified
+          gh release download beta-0.1.18 -p "CommanderLab-Beta-0.1.18-Setup.exe" -p "CommanderLab-Beta-0.1.18-Windows-Portable.zip" -p "SHA256SUMS.txt" -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
