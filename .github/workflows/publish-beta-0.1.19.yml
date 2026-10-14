@@ -1,0 +1,97 @@
+name: Publish Commander Lab Beta 0.1.19 — User Evaluation
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.19.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.19
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse overwriting release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.19 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Beta 0.1.19 already published; refusing overwrite' >&2; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.19" >/dev/null 2>&1; then
+            echo 'Beta 0.1.19 tag already exists; refusing overwrite' >&2; exit 1
+          fi
+      - name: Download exact Windows evaluation build artifact
+        env:
+          WINDOWS_EVALUATION_ARCHIVE_URL: "https://sdmntprukwest.oaiusercontent.com/files/00000000-1780-8243-8a3b-496f28bd746c/raw?se=2026-10-14T01%3A24%3A38Z&sp=r&sv=2026-02-06&sr=b&scid=27ba95e4-7ca1-5222-8442-1e8520cc652e&skoid=9b9c502c-68d7-438f-bea0-600feb684c90&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-13T20%3A28%3A15Z&ske=2026-10-14T20%3A28%3A15Z&sks=b&skv=2026-02-06&sig=jUUXlIEsGAAvhDGvx16mNDni643aV9ZYRhiIOBbsBcA%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$WINDOWS_EVALUATION_ARCHIVE_URL" -o evaluation.zip
+          echo '4b7e265c295f706507aaf9a0b12c455744f12f30fa8edb73ca1e56988838753f  evaluation.zip' | sha256sum -c -
+          mkdir -p release
+          unzip -q evaluation.zip -d release
+          test -s release/CommanderLab-Beta-0.1.19-Setup.exe
+          test -s release/SHA256SUMS.txt
+          grep -Fq 'Source commit: 9b5bae8eaecf3d72fe642cc469287eb8bd413787' release/RELEASE_NOTES.md
+      - name: Pin installer identity and updater manifest
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.19-Setup.exe)" -eq 21470448
+          echo 'd4def167cfc3808961ddf2b24c5e892c658c0ca379af06491236ead06276a041  CommanderLab-Beta-0.1.19-Setup.exe' | sha256sum -c -
+          # The Windows evaluation artifact did not upload a portable ZIP.
+          # Rewrite manifest to list only the artifact actually being published.
+          printf '%s\n' 'd4def167cfc3808961ddf2b24c5e892c658c0ca379af06491236ead06276a041  CommanderLab-Beta-0.1.19-Setup.exe' > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+      - name: Write explicit user-evaluation release notes
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          # Commander Lab Beta 0.1.19 — User Evaluation
+
+          **Testing beta — not fully regression-qualified.**
+          User-authorized publication for the in-app Windows updater.
+
+          Exact packaged source commit: `9b5bae8eaecf3d72fe642cc469287eb8bd413787`.
+          Windows evaluation packaging: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38488598086 — SUCCESS.
+
+          ## Changes for deck-builder evaluation
+          - Prefer additional verified engine-completion support in the final 99.
+          - Stronger mana-pressure checks for higher-demand proposed substitutions.
+          - Safer oracle-evidence handling and protection of explicitly Included card choices.
+          - Improved final-deck diagnostic provenance and AI tradeoff safeguards from the Beta 0.1.19 development cycle.
+
+          ## Qualification and limitations
+          - Windows executable creation, GUI subsystem, packaged first launch, native shell checks, silent installer launch, and synthetic existing-user-profile preservation passed.
+          - **Full release-critical regression qualification did not pass**: the latest full test run reported three failed assertions, including outdated compatibility expectations; further qualification remains pending.
+          - This release is for real-user deck-quality evaluation, not proof of optimized Commander deck strength.
+          - Installer is unsigned and may trigger a Windows SmartScreen warning.
+          - No private collection, protected deck allocation, saved user projects, or credentials are bundled.
+          - This publication includes the Windows Setup installer, checksum manifest, and release notes only; the packaging upload omitted the portable ZIP.
+          - Back up important local data before updating as a precaution.
+
+          ## In-app update
+          From an earlier installed Windows beta, open Settings → Check for Updates. The updater should discover Beta 0.1.19 and verify the downloaded installer SHA-256 before applying it.
+          NOTES
+      - name: Publish updater-visible Beta 0.1.19 prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.19 release/CommanderLab-Beta-0.1.19-Setup.exe release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.19 — User Evaluation" --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify public updater asset names and installer checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.19 -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.19-Setup.exe'
+          printf '%s\n' "$names" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$names" | grep -Fx 'RELEASE_NOTES.md'
+          mkdir -p verified
+          gh release download beta-0.1.19 -p 'CommanderLab-Beta-0.1.19-Setup.exe' -p 'SHA256SUMS.txt' -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
