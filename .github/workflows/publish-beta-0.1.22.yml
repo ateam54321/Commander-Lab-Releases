@@ -1,0 +1,106 @@
+name: Publish Commander Lab Beta 0.1.22 — No-AI Guided Testing
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.22.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.22
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse any existing tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.22 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Beta 0.1.22 already published; refusing overwrite.' >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.22" >/dev/null 2>&1; then
+            echo 'Beta 0.1.22 tag already exists; refusing overwrite.' >&2
+            exit 1
+          fi
+      - name: Retrieve SHA-256-pinned Windows-qualified candidate
+        env:
+          WINDOWS_CANDIDATE_URL: "https://sdmntpreastus2.oaiusercontent.com/files/00000000-3d2c-81f6-a44d-fc394064f139/raw?se=2026-10-15T23%3A40%3A00Z&sp=r&sv=2026-02-06&sr=b&scid=cdca527e-3af2-575f-acc6-9029ef650f76&skoid=9b9c502c-68d7-438f-bea0-600feb684c90&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-15T13%3A31%3A00Z&ske=2026-10-16T13%3A31%3A00Z&sks=b&skv=2026-02-06&sig=WY3/0WofcmmCasgxnFcJEzYUMz2R2HjQgXWyg5lb/EM%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$WINDOWS_CANDIDATE_URL" -o candidate.zip
+          echo '752d4c8b2d99ee9afef12bcb2b3733512fff1e2f02221e9a769a60990559eac2  candidate.zip' | sha256sum -c -
+          mkdir -p release
+          unzip -q candidate.zip -d release
+          test -s release/CommanderLab-Beta-0.1.22-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.22-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          grep -Fq 'Source commit: 4fd59bd04d54a82f1a0569139d30814a41598e96' release/RELEASE_NOTES.md
+      - name: Verify installer and portable asset identities
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.22-Setup.exe)" -eq 21495808
+          test "$(stat -c %s CommanderLab-Beta-0.1.22-Windows-Portable.zip)" -eq 24680069
+          echo '480311707042d4d32e31f1038eb848d439fd1db223e170051166d0bc03b3ce45  CommanderLab-Beta-0.1.22-Setup.exe' | sha256sum -c -
+          echo '4540d0fd5c2d2d865678834f2c1ec6ecf6a6b6a24f552298b60d47305fc3b572  CommanderLab-Beta-0.1.22-Windows-Portable.zip' | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+      - name: Write transparent prerelease notes
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          # Commander Lab Beta 0.1.22 — No-AI Guided Deckbuilding Test
+
+          **User-authorized testing prerelease.** This is for hands-on evaluation, not a claim of full end-to-end qualification.
+
+          Exact Windows package source commit: `4fd59bd04d54a82f1a0569139d30814a41598e96`.
+          Windows focused-evaluation build: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38824261756 — SUCCESS.
+          Full regression suite: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38823533269 — not complete when this candidate was authorized for publication.
+
+          ## What changed
+          - No-AI commander-first Strategy Discovery now offers conservative printed-ability paths without needing an AI account.
+          - Local strategy selection carries into the Blueprint, candidate pool and provisional 99.
+          - Guided Step 5 can finish through a conservative Brain-only review without opening AI Settings.
+          - Brain-only review preserves the validated 99 rather than inventing a better exact-slot replacement.
+          - Protected-deck allocation, ownership, deck legality, collection-wide review coverage, and current-state validation remain release-blocking constraints.
+          - Additional commander-theme, reanimation-evidence, and physical-allocation integrity corrections.
+
+          ## What passed
+          - Focused No-AI Commander Discovery, Guided review/lock-navigation, physical allocation, and practical engine regression tests.
+          - Core desktop smoke tests, Python compilation, native Windows GUI executable check and self-check.
+          - Packaged-app startup, installer creation, installed-app startup and synthetic existing-profile preservation.
+          - Verified SHA-256 checksums for the downloaded installer and portable ZIP.
+
+          ## What still needs real-user verification
+          - Full repository test suite was not established complete for this candidate.
+          - A real six-step Guided No-AI build in your own collection, ending with a valid committed deck and ManaBox export, still needs hands-on testing.
+          - Magic card selection quality remains for independent deck review; these checks do not establish deck strength.
+          - Installer is unsigned and may prompt Microsoft SmartScreen. Back up your local collection/projects before updating.
+          - The installer contains no personal collections, allocations, saved decks, or account credentials.
+
+          ## Updating
+          On an earlier Windows beta, use Settings → Check for Updates or install the new 0.1.22 Setup.exe. Published Beta 0.1.21 remains available.
+          NOTES
+      - name: Publish new prerelease without overwriting previous beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.22 release/CommanderLab-Beta-0.1.22-Setup.exe release/CommanderLab-Beta-0.1.22-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.22 — No-AI Guided Deckbuilding Test" --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Confirm published artifacts and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.22 -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.22-Setup.exe'
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.22-Windows-Portable.zip'
+          printf '%s\n' "$names" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$names" | grep -Fx 'RELEASE_NOTES.md'
+          mkdir -p verified
+          gh release download beta-0.1.22 -p 'CommanderLab-Beta-0.1.22-Setup.exe' -p 'CommanderLab-Beta-0.1.22-Windows-Portable.zip' -p 'SHA256SUMS.txt' -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
