@@ -1,0 +1,99 @@
+name: Publish Commander Lab Beta 0.1.20 — ChatGPT Model Hotfix
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.20.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.20
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse existing release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.20 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Beta 0.1.20 already exists; refusing overwrite' >&2; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.20" >/dev/null 2>&1; then
+            echo 'Beta 0.1.20 tag already exists; refusing overwrite' >&2; exit 1
+          fi
+      - name: Retrieve exact Windows hotfix package
+        env:
+          WINDOWS_HOTFIX_ARCHIVE_URL: "https://sdmntprnortheu.oaiusercontent.com/files/00000000-cebc-81f4-852f-44c557a4f2e8/raw?se=2026-10-15T16%3A42%3A25Z&sp=r&sv=2026-02-06&sr=b&scid=7f0fcedf-6917-5c3b-bc65-ac55e057356c&skoid=9b9c502c-68d7-438f-bea0-600feb684c90&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-15T13%3A31%3A24Z&ske=2026-10-16T13%3A31%3A24Z&sks=b&skv=2026-02-06&sig=TkN7ZgCDTAib0K4rg1UQgSvhqg3zDVCd5Is9qZuRj1A%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$WINDOWS_HOTFIX_ARCHIVE_URL" -o evaluated-hotfix.zip
+          echo '1b9c4d58698d3ac723b01c9fc9d81fb0181a380486d215be206dd4d44f01b71a  evaluated-hotfix.zip' | sha256sum -c -
+          mkdir -p release
+          unzip -q evaluated-hotfix.zip -d release
+          test -s release/CommanderLab-Beta-0.1.20-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.20-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+          grep -Fq 'Source commit: 006057e80acf897cc9b8341731f8b898bf919a7c' release/RELEASE_NOTES.md
+      - name: Verify installer portable hashes and update manifest
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.20-Setup.exe)" -eq 21470978
+          test "$(stat -c %s CommanderLab-Beta-0.1.20-Windows-Portable.zip)" -eq 24658331
+          echo '217d26715a74957dc142a9c1bb7d78410021010aa243c7d10227a9b5553270f4  CommanderLab-Beta-0.1.20-Setup.exe' | sha256sum -c -
+          echo '7bc3bf7393b93994d3f8814c20fbe81f294565eb553017f16c2eaefd46a221b7  CommanderLab-Beta-0.1.20-Windows-Portable.zip' | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+      - name: Write transparent hotfix release notes
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          # Commander Lab Beta 0.1.20 — ChatGPT Model Compatibility Hotfix
+
+          **Testing prerelease; full regression qualification is not asserted.**
+          Authorized release to the Commander Lab in-app updater.
+
+          Exact Windows packaged application source commit: `006057e80acf897cc9b8341731f8b898bf919a7c`.
+          Windows build and focused model-access regression: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38768398962 — SUCCESS.
+
+          ## Fixes
+          - Resolve ChatGPT plan model selections using the live account-visible model catalog instead of relying only on the former hardcoded GPT-5.5 default.
+          - Recover from the specific HTTP 400 Codex/ChatGPT-account unsupported-model rejection by choosing another account-visible model.
+          - Preserve hard failures for unrelated HTTP errors rather than silently substituting models.
+          - Report the actual model used after recovery in AI request metadata.
+          - Preserve previous Beta 0.1.19 deck-building engine improvements.
+
+          ## Validation and limitations
+          - Focused ChatGPT model-access regression tests passed in the Windows candidate build.
+          - Windows executable GUI checks, native startup, clean packaged startup, installer creation, installed-app startup and synthetic existing-user profile preservation passed.
+          - Full repository-wide regression qualification has not been established for this hotfix. The previous Beta 0.1.19 full qualification had three unresolved test failures.
+          - Your actual connected ChatGPT model catalog and end-to-end Edgar deck generation still require a real desktop test.
+          - The Windows installer is unsigned and may trigger SmartScreen. Back up important local data before updating.
+          - No collection, allocations, projects, preferences or ChatGPT credentials from any user are bundled.
+
+          ## Updating
+          On an earlier Windows desktop beta, use Settings → Check for Updates to find 0.1.20. The updater downloads the published installer and checks SHA-256 against the published manifest before installation.
+          NOTES
+      - name: Publish updater-visible Beta 0.1.20
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.20 release/CommanderLab-Beta-0.1.20-Setup.exe release/CommanderLab-Beta-0.1.20-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.20 — ChatGPT Model Compatibility Hotfix" --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify released update assets and SHA-256
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.20 -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.20-Setup.exe'
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.20-Windows-Portable.zip'
+          printf '%s\n' "$names" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$names" | grep -Fx 'RELEASE_NOTES.md'
+          mkdir -p verified
+          gh release download beta-0.1.20 -p 'CommanderLab-Beta-0.1.20-Setup.exe' -p 'CommanderLab-Beta-0.1.20-Windows-Portable.zip' -p 'SHA256SUMS.txt' -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
