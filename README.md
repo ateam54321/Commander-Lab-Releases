@@ -2,19 +2,19 @@
 
 Public Windows beta releases for **Commander Lab**. The application source code is maintained separately in the private development repository.
 
-## Latest release — Beta 0.1.15
+## Latest release — Beta 0.1.22
 
-**[Get Commander Lab Beta 0.1.15](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.15)**
+**[Get Commander Lab Beta 0.1.22](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.22)**
 
-- Windows installer: `CommanderLab-Beta-0.1.15-Setup.exe`
-- Portable Windows app: `CommanderLab-Beta-0.1.15-Windows-Portable.zip`
+- Windows installer: `CommanderLab-Beta-0.1.22-Setup.exe`
+- Portable Windows app: `CommanderLab-Beta-0.1.22-Windows-Portable.zip`
 - Integrity verification: `SHA256SUMS.txt`
 
-Beta 0.1.15 fixes two issues observed during the first real 0.1.14 Edgar test: repeated ChatGPT context-length errors in final AI critique, and a Guided Step 5/Step 6 mismatch where completed reviewed cards could be reopened after validated swaps. The hotfix adds a short-context retry, prevents Guided swap review resets, and provides a user-triggered **Restore previously completed review decisions** action that requires exact prior historical verdicts; it never fabricates approvals or changes protected allocations. The exact Windows-qualified build passed **1,600 tests**, packaged EXE, installer and synthetic existing-profile preservation checks in [run 38275916167](https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38275916167). Final deck strength remains unproven until another user trial.
+This is a user-authorized **testing prerelease** focused on fixing the complete Guided deckbuilding workflow when **No AI** is selected. Commander-first Strategy Discovery, deterministic Blueprint/candidate selection, Brain-built provisional 99, and conservative Brain-only final review are available without an AI account.
 
-For an existing installation, use the in-app updater or download the latest installer from the release page. Do not delete your collection or saved decks to update; keeping a normal backup is recommended.
+Focused No-AI regressions, core smokes, Windows packaged-app startup, installer startup, and synthetic existing-profile preservation passed in [Windows run 38824261756](https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38824261756). The full repository-wide regression run had **not completed** at release time, and a real six-step No-AI deck build remains to be verified by the user. See the release notes for details.
 
-The installer is unsigned and may show a **Microsoft SmartScreen Unknown Publisher** warning. No personal collections, deck allocations, authentication data or user profiles are included with the installer.
+For an existing installation, use Settings → Check for Updates or the installer above. Important local collections and saved decks should be backed up before updating. The installer is unsigned and may show a Microsoft SmartScreen warning. No private collections, card allocations, saved projects, or credentials are included in the installer.
 
 ## Previous releases
 
