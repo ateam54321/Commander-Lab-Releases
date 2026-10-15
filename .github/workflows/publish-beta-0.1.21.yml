@@ -1,0 +1,98 @@
+name: Publish Commander Lab Beta 0.1.21 — Guided Review Ledger Hotfix
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.21.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.21
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse existing release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.21 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Beta 0.1.21 already exists; refusing overwrite' >&2; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.21" >/dev/null 2>&1; then
+            echo 'Beta 0.1.21 tag already exists; refusing overwrite' >&2; exit 1
+          fi
+      - name: Retrieve exact Windows hotfix package
+        env:
+          WINDOWS_HOTFIX_ARCHIVE_URL: "https://sdmntprwestcentralus.oaiusercontent.com/files/00000000-93a8-81fb-a17b-4f3adc05474e/raw?se=2026-10-15T18%3A41%3A21Z&sp=r&sv=2026-02-06&sr=b&scid=c9476cf3-d238-58c2-b20c-c0f950065116&skoid=9b9c502c-68d7-438f-bea0-600feb684c90&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-15T13%3A59%3A34Z&ske=2026-10-16T13%3A59%3A34Z&sks=b&skv=2026-02-06&sig=W7g3qSs4y5SCmKNlE7pTcED3cXxKXBEfmTLO2ZVYIwQ%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$WINDOWS_HOTFIX_ARCHIVE_URL" -o evaluated-hotfix.zip
+          echo 'df7d71778e979d5a6e9b7c199d1176e96d822a2b0b70dad4bfe3468dc94fd957  evaluated-hotfix.zip' | sha256sum -c -
+          mkdir -p release
+          unzip -q evaluated-hotfix.zip -d release
+          test -s release/CommanderLab-Beta-0.1.21-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.21-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          test -s release/RELEASE_NOTES.md
+          grep -Fq 'Source commit: 4c6f2dee09d8ee17e3e4f3c3e33e3daa57756486' release/RELEASE_NOTES.md
+      - name: Verify installer portable hashes and update manifest
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.21-Setup.exe)" -eq 21470780
+          test "$(stat -c %s CommanderLab-Beta-0.1.21-Windows-Portable.zip)" -eq 24658903
+          echo '41d3f3967c6b83909a8c53a877dd080d0febc1de5f412b8c6d38b5eeddffddaf  CommanderLab-Beta-0.1.21-Setup.exe' | sha256sum -c -
+          echo '96c50d14631860cfaf810d16f28861bd6b9153ac3339ef3c0cf0f1256e2cc0d7  CommanderLab-Beta-0.1.21-Windows-Portable.zip' | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+      - name: Write transparent hotfix release notes
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          # Commander Lab Beta 0.1.21 — Guided Review Ledger Repair
+
+          **Testing prerelease; full regression qualification is not asserted.**
+          Authorized release to the Commander Lab in-app updater.
+
+          Exact Windows packaged application source commit: `4c6f2dee09d8ee17e3e4f3c3e33e3daa57756486`.
+          Windows build and focused model-access regression: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38786318651 — SUCCESS.
+
+          ## Fixes
+          - Preserve completed Guided Review decisions when the existing 99, collection scope, and review ledger still match their completed receipt.
+          - Correct the repair path to inspect consecutive sync-only history events without losing an older proven Brain/AI verdict.
+          - Never manufacture reviewed/rejected decisions: genuinely unproven cards remain blocked for manual review.
+          - Preserve the earlier Beta 0.1.20 ChatGPT model-compatibility hotfix.
+
+          ## Validation and limitations
+          - Focused Guided review ledger repair, repeated-sync prevention, and ChatGPT model-access regression tests passed in the Windows candidate build.
+          - Windows executable GUI checks, native startup, clean packaged startup, installer creation, installed-app startup and synthetic existing-user profile preservation passed.
+          - Full repository-wide regression qualification has not been established for this hotfix. The previous full qualification had unresolved test failures.
+          - The three pending cards in the existing Edgar project still require post-update desktop verification; this candidate does not auto-approve unproven verdicts.
+          - The Windows installer is unsigned and may trigger SmartScreen. Back up important local data before updating.
+          - No collection, allocations, projects, preferences or ChatGPT credentials from any user are bundled.
+
+          ## Updating
+          On an earlier Windows desktop beta, use Settings → Check for Updates to find 0.1.21. The updater downloads the published installer and checks SHA-256 against the published manifest before installation.
+          NOTES
+      - name: Publish updater-visible Beta 0.1.21
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.21 release/CommanderLab-Beta-0.1.21-Setup.exe release/CommanderLab-Beta-0.1.21-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.21 — Guided Review Ledger Repair" --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify released update assets and SHA-256
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.21 -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.21-Setup.exe'
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.21-Windows-Portable.zip'
+          printf '%s\n' "$names" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$names" | grep -Fx 'RELEASE_NOTES.md'
+          mkdir -p verified
+          gh release download beta-0.1.21 -p 'CommanderLab-Beta-0.1.21-Setup.exe' -p 'CommanderLab-Beta-0.1.21-Windows-Portable.zip' -p 'SHA256SUMS.txt' -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
