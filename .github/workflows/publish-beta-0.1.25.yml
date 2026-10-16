@@ -1,0 +1,102 @@
+name: Publish Commander Lab Beta 0.1.25 - AI Rollback
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.25.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.25
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse existing public release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.25 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Beta 0.1.25 already exists; refusing overwrite.' >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.25" >/dev/null 2>&1; then
+            echo 'Beta 0.1.25 tag exists; refusing overwrite.' >&2
+            exit 1
+          fi
+      - name: Retrieve exact qualified Windows candidate
+        env:
+          WINDOWS_CANDIDATE_URL: "https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-22c8-820e-a7dc-0ec0e74b0e87/raw?se=2026-10-16T19%3A14%3A04Z&sp=r&sv=2026-02-06&sr=b&scid=c6df7d16-0877-50ba-99a8-f42157042ed6&skoid=9b9c502c-68d7-438f-bea0-600feb684c90&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-16T14%3A15%3A22Z&ske=2026-10-17T14%3A15%3A22Z&sks=b&skv=2026-02-06&sig=JTBDEbvS6XD7/cxKp0XVM11bpqHyD%2BFw%2B8A/86WOlVY%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$WINDOWS_CANDIDATE_URL" -o candidate.zip
+          echo '47c098474c0be56c65b4ac3367e591cba4f62eed5df5d97b140040ac30d3657f  candidate.zip' | sha256sum -c -
+          mkdir -p release
+          unzip -q candidate.zip -d release
+          test -s release/CommanderLab-Beta-0.1.25-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.25-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          grep -Fq 'Source commit: 9231f335ea44acfbdc9290075ab6cc79b662ba88' release/RELEASE_NOTES.md
+      - name: Verify installer and portable SHA-256 and size
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.25-Setup.exe)" -eq 21512612
+          test "$(stat -c %s CommanderLab-Beta-0.1.25-Windows-Portable.zip)" -eq 24701142
+          echo 'ecb94555da9b8911ae84e3513c6e2d9b9cec5dc4c8332063443545814eb2d3c9  CommanderLab-Beta-0.1.25-Setup.exe' | sha256sum -c -
+          echo '7b3738e6654e2fb361876ffe95602b3d458a5583d88afdc8adb5182908912d0f  CommanderLab-Beta-0.1.25-Windows-Portable.zip' | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+      - name: Write rollback release notes
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          # Commander Lab Beta 0.1.25 — Restore Previous AI Deckbuilding
+          
+          Public Windows prerelease approved by the user on October 16, 2026. Supports the in-app updater from Beta 0.1.24.
+          
+          Exact qualified source: `9231f335ea44acfbdc9290075ab6cc79b662ba88`
+          Qualified Windows tests, executable, installer and existing-profile preservation: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38951972899 — SUCCESS.
+          
+          ## What changed
+          - Rolled AI-assisted construction/review back to the previously qualified Beta 0.1.23 behavior, restoring the full candidate-refinement guidance, 12 tool rounds at high reasoning, and full collection-review instructions.
+          - Preserved the Beta 0.1.23 no-AI Strategy Discovery and Brain-only construction improvements.
+          - Removed the Beta 0.1.24 Economy/Balanced/Deep AI budget selector and experimental AI optimization/quality modifications. AI requests may increase.
+          - New app version identity allows ordinary Settings updates without overwriting Beta 0.1.24.
+          
+          ## Verification
+          - Full Windows release-critical source suite and desktop regression checks passed.
+          - Packaged GUI executable, native-shell self-check, fresh-start smoke and installed-app launch passed.
+          - Synthetic existing user profile settings and authentication files were preserved.
+          - Installer and portable ZIP SHA-256 checksums were independently verified.
+          
+          ## Important limitations
+          - This is a rollback, not proof that Edgar Markov's strategy-to-final-deck problem is fixed. The 0.1.24 Deep Edgar 45/100 regression remains under investigation.
+          - The earlier 0.1.23 AI behavior is restored, but deck quality must be evaluated on a fresh user-generated deck.
+          - No private collection, projects, protected allocation ledger or credentials are bundled.
+          - The Windows installer is unsigned and might display a SmartScreen warning. Back up important local app data before upgrading.
+          
+          ## Update
+          Open Commander Lab → Settings → Check for Updates and install Beta 0.1.25. Use the installer below if the in-app updater does not offer the release.
+          NOTES
+      - name: Create immutable public prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.25 release/CommanderLab-Beta-0.1.25-Setup.exe release/CommanderLab-Beta-0.1.25-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.25 — AI Rollback" --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify published release assets and hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.25 -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.25-Setup.exe'
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.25-Windows-Portable.zip'
+          printf '%s\n' "$names" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$names" | grep -Fx 'RELEASE_NOTES.md'
+          mkdir -p verified
+          gh release download beta-0.1.25 -p 'CommanderLab-Beta-0.1.25-Setup.exe' -p 'CommanderLab-Beta-0.1.25-Windows-Portable.zip' -p 'SHA256SUMS.txt' -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
