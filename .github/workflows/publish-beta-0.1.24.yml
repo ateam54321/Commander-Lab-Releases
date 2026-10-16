@@ -1,0 +1,106 @@
+name: Publish Commander Lab Beta 0.1.24 - Brain Quality and AI Efficiency
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.24.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.24
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse any existing public release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.24 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Beta 0.1.24 already published. Refusing overwrite.' >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.24" >/dev/null 2>&1; then
+            echo 'Beta 0.1.24 tag exists. Refusing overwrite.' >&2
+            exit 1
+          fi
+      - name: Retrieve and verify exact Windows-qualified artifact
+        env:
+          WINDOWS_CANDIDATE_URL: "https://sdmntprsouthcentralus.oaiusercontent.com/files/00000000-fc0c-81f7-bc81-40a64867aa0c/raw?se=2026-10-16T04%3A00%3A31Z&sp=r&sv=2026-02-06&sr=b&scid=6568af00-c278-5c9d-a7ac-f25d254d340a&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-16T01%3A38%3A49Z&ske=2026-10-17T01%3A38%3A49Z&sks=b&skv=2026-02-06&sig=Pue6XczECNBRXIQfR8sSkx9hRf/oWUpuZlODGnujXBQ%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$WINDOWS_CANDIDATE_URL" -o candidate.zip
+          echo '74c6aef99b3a17a4e185a3a101f535e0d860f3a92637394159ebbd108e97d28a  candidate.zip' | sha256sum -c -
+          mkdir -p release
+          unzip -q candidate.zip -d release
+          test -s release/CommanderLab-Beta-0.1.24-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.24-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          grep -Fq 'Source commit: dea6ebddec54c66982bc6f450ab9d18aa5b43d70' release/RELEASE_NOTES.md
+      - name: Verify installer and portable hashes and identities
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.24-Setup.exe)" -eq 21534873
+          test "$(stat -c %s CommanderLab-Beta-0.1.24-Windows-Portable.zip)" -eq 24726003
+          echo '4064f2b5f099e2ffa16aa25db925d03249c3ee37689de776bb02a417438a23a9  CommanderLab-Beta-0.1.24-Setup.exe' | sha256sum -c -
+          echo 'c3da852e77f3125b9749fb935b9985a88161880aefe09f800b00b8898d5b9711  CommanderLab-Beta-0.1.24-Windows-Portable.zip' | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+      - name: Write accurate prerelease notes
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          # Commander Lab Beta 0.1.24 — Brain Quality and AI Efficiency
+
+          Public prerelease authorized by the user. This is an in-app updater compatible Windows beta.
+
+          Source commit: `dea6ebddec54c66982bc6f450ab9d18aa5b43d70`
+          Qualified Windows installer build: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38846947820 — SUCCESS.
+          Prior source focused/full Windows qualification: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/38843644908 — SUCCESS.
+
+          ## Improvements
+          - Economy, Balanced and Deep optional AI critique depth, with measured provider-reported usage summaries where supplied.
+          - Existing AI Strategy Discovery prompts and recommendation ordering retained.
+          - Complete Beta 0.1.23 no-AI Strategy Discovery and Guided Brain-only improvements included.
+          - Stronger final-99 printed resource pipelines, sacrifice-fodder/outlet matching and graveyard target evidence.
+          - Better commander printed spell-trigger threshold and category recognition, and cautious combo shared-dependency reporting.
+          - Fail-closed AI 99 review when a last established engine, card-access or other concrete capability is lost.
+          - Preserved physical ownership, protected allocations, legal deck validation and existing project settings.
+
+          ## Verified
+          - Full release-critical Windows source regression suite, GUI executable, bundle integrity and native self-check.
+          - Packaged application clean start, installer creation and installed application startup.
+          - Synthetic existing-profile settings and authentication file preservation.
+          - Exact SHA-256 hashes of Windows installer and portable ZIP.
+
+          ## Limitations and user testing
+          - Automated tests do not prove real Commander deck power or guaranteed win rates.
+          - Exact ChatGPT-plan quota and real-world AI savings remain unmeasured. Usage indicators reflect only recorded requests.
+          - No existing personal decks, physical collection, account credentials or allocations are bundled.
+          - Installer is unsigned and may show Microsoft SmartScreen warnings; back up personal data before any app update.
+
+          ## Update from an older beta
+          Open Commander Lab Settings, check for updates, and install Beta 0.1.24. Older published betas are not overwritten.
+          NOTES
+      - name: Publish a new public prerelease without overwriting older releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.24 release/CommanderLab-Beta-0.1.24-Setup.exe release/CommanderLab-Beta-0.1.24-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.24 — Brain Quality and AI Efficiency" --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify published release installer and ZIP checksum identities
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.24 -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.24-Setup.exe'
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.24-Windows-Portable.zip'
+          printf '%s\n' "$names" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$names" | grep -Fx 'RELEASE_NOTES.md'
+          mkdir -p verified
+          gh release download beta-0.1.24 -p 'CommanderLab-Beta-0.1.24-Setup.exe' -p 'CommanderLab-Beta-0.1.24-Windows-Portable.zip' -p 'SHA256SUMS.txt' -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
