@@ -1,0 +1,103 @@
+name: Publish Commander Lab Beta 0.1.26 - Manual Editor Hotfix
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-beta-0.1.26.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: publish-beta-0.1.26
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse existing public release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view beta-0.1.26 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Beta 0.1.26 already exists; refusing overwrite.' >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/beta-0.1.26" >/dev/null 2>&1; then
+            echo 'Beta 0.1.26 tag exists; refusing overwrite.' >&2
+            exit 1
+          fi
+      - name: Retrieve exact qualified Windows candidate
+        env:
+          WINDOWS_CANDIDATE_URL: "https://sdmntprsouthcentralus.oaiusercontent.com/files/00000000-ad24-81f7-9783-da558863c5df/raw?se=2026-10-17T17%3A10%3A44Z&sp=r&sv=2026-02-06&sr=b&scid=43bb69b9-b58e-502a-b217-30eca00286b9&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-16T18%3A50%3A42Z&ske=2026-10-17T18%3A50%3A42Z&sks=b&skv=2026-02-06&sig=hBwuWNmmQnwe7xaCIyo0Vyc01k9g%2BW1cPvFVHrpO2fM%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 240 "$WINDOWS_CANDIDATE_URL" -o candidate.zip
+          echo 'b98c070160fc0179e833872c3b7d8f0df6b5a91e91d07005dd55bd0db06932ed  candidate.zip' | sha256sum -c -
+          mkdir -p release
+          unzip -q candidate.zip -d release
+          test -s release/CommanderLab-Beta-0.1.26-Setup.exe
+          test -s release/CommanderLab-Beta-0.1.26-Windows-Portable.zip
+          test -s release/SHA256SUMS.txt
+          grep -Fq 'Source commit: 839dfe6d9f6a4d1a0aca69f243b7620237aaca8a' release/RELEASE_NOTES.md
+      - name: Verify installer and portable SHA-256 and size
+        run: |
+          set -euo pipefail
+          cd release
+          test "$(stat -c %s CommanderLab-Beta-0.1.26-Setup.exe)" -eq 21517245
+          test "$(stat -c %s CommanderLab-Beta-0.1.26-Windows-Portable.zip)" -eq 24703660
+          echo '4fee921415558a1c2225a2d6c8a6d0e8a59a802afabf2473a6d1b4470a5b5a5c  CommanderLab-Beta-0.1.26-Setup.exe' | sha256sum -c -
+          echo 'f82f9a7f4f23489495e2e8a4ee8056dc16ee3b89808f22ff1e9c819d94d71829  CommanderLab-Beta-0.1.26-Windows-Portable.zip' | sha256sum -c -
+          sha256sum -c SHA256SUMS.txt
+      - name: Write rollback release notes
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          # Commander Lab Beta 0.1.26 — Manual Editor Oracle-Name Hotfix
+          
+          User-authorized Windows prerelease. In-app updater compatible from Beta 0.1.25.
+          
+          Exact Windows-qualified source commit: `839dfe6d9f6a4d1a0aca69f243b7620237aaca8a`.
+          Qualification: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/39051631234 — SUCCESS.
+          Staging targeted tests: https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/39037561198 — SUCCESS.
+          
+          ## Hotfix
+          - Manual Deck Editor now resolves an exact card name such as Llanowar Elves when the reference database contains only one Commander-legal Oracle identity, even if another nonlegal identity shares the same name.
+          - If several genuinely Commander-legal Oracle identities still share a name, the app refuses to guess and explains that selection is required.
+          - Existing physical ownership, protected card allocation, legality and singleton gates remain authoritative; failed additions never commit a saved deck change.
+          - The previous Beta 0.1.25 AI Brain rollback, No-AI Strategy Discovery improvements, and all other deckbuilding behavior remain unchanged.
+          
+          ## Verified
+          - Full Windows release-critical source regression suite, targeted exact-name tests and Python compile passed.
+          - Packaged Windows GUI executable, clean-start smoke, installer and installed-app startup passed.
+          - Synthetic existing-profile preferences and authentication files remained unchanged during installation.
+          - Installer, portable ZIP and release archive SHA-256 identities checked against the exact successful workflow artifacts.
+          
+          ## Limits
+          - This solves the unique-legal-identity ambiguity, not every possible same-name conflict. A genuinely ambiguous legal-name catalog will still need an explicit identity selector.
+          - Automated checks do not certify deck power or verify the user's local collection state.
+          - No user data or private decks are bundled. Back up important local data before updating.
+          - The unsigned installer may show Microsoft SmartScreen warnings.
+          
+          ## Update
+          Open Commander Lab Settings, select Check for Updates, and install Beta 0.1.26. If your updater does not offer the release, use the Windows installer in the assets below.
+          NOTES
+      - name: Create immutable public prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create beta-0.1.26 release/CommanderLab-Beta-0.1.26-Setup.exe release/CommanderLab-Beta-0.1.26-Windows-Portable.zip release/SHA256SUMS.txt release/RELEASE_NOTES.md --repo "$GITHUB_REPOSITORY" --target main --title "Commander Lab Beta 0.1.26 — Manual Editor Hotfix" --notes-file release/RELEASE_NOTES.md --prerelease
+      - name: Verify published release assets and hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          names="$(gh release view beta-0.1.26 -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.26-Setup.exe'
+          printf '%s\n' "$names" | grep -Fx 'CommanderLab-Beta-0.1.26-Windows-Portable.zip'
+          printf '%s\n' "$names" | grep -Fx 'SHA256SUMS.txt'
+          printf '%s\n' "$names" | grep -Fx 'RELEASE_NOTES.md'
+          mkdir -p verified
+          gh release download beta-0.1.26 -p 'CommanderLab-Beta-0.1.26-Setup.exe' -p 'CommanderLab-Beta-0.1.26-Windows-Portable.zip' -p 'SHA256SUMS.txt' -D verified -R "$GITHUB_REPOSITORY"
+          cd verified
+          sha256sum -c SHA256SUMS.txt
