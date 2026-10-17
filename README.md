@@ -1,21 +1,21 @@
 # Commander Lab Releases
 
-Public Windows beta releases for **Commander Lab**. The application source code lives in the separate development repository.
+Public Windows beta releases for **Commander Lab**. Source code lives in the separate development repository.
 
-## Latest release — Beta 0.1.26
+## Latest release — Beta 0.1.27
 
-**[Download Commander Lab Beta 0.1.26](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.26)**
+**[Get Commander Lab Beta 0.1.27](https://github.com/ateam54321/Commander-Lab-Releases/releases/tag/beta-0.1.27)**
 
-- Windows installer: `CommanderLab-Beta-0.1.26-Setup.exe`
-- Windows portable app: `CommanderLab-Beta-0.1.26-Windows-Portable.zip`
-- Verification: `SHA256SUMS.txt`
+- Windows installer: `CommanderLab-Beta-0.1.27-Setup.exe`
+- Portable Windows app: `CommanderLab-Beta-0.1.27-Windows-Portable.zip`
+- Release verification: `SHA256SUMS.txt`
 
-This user-authorized hotfix corrects the **Manual Deck Editor exact-name lookup** when one card name has more than one Oracle record but only one of those identities is Commander-legal. For example, entering **Llanowar Elves** should now select the unique Commander-legal identity in such a catalog. The editor still blocks genuine multiple-legal-identity ambiguity instead of guessing.
+This user-requested hotfix fixes **Deck Import and Manual Deck Editor card/token name collisions**. Names such as **Starscape Cleric** may exist in both playable card records and offspring token records. Commander Lab now ignores token identities when choosing the one legal playable card. When more than one real legal identity remains, exact set and collector data can distinguish it, otherwise the app still reports ambiguity rather than guessing.
 
-The existing Beta 0.1.25 AI Brain behavior, protected collection/allocation checks and no-AI Strategy Discovery remain unchanged. The complete Windows regression suite, packaged application, installer, installed-app startup and synthetic existing-profile preservation passed in [Windows qualification run 39051631234](https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/39051631234). The [public release verification](https://github.com/ateam54321/Commander-Lab-Releases/actions/runs/39052328890) succeeded and confirmed both published binaries' SHA-256 checksums.
+The Beta 0.1.26 AI Brain and no-AI Strategy Discovery behavior remains unchanged. All Windows release-critical source regressions, GUI/installer checks, clean-start tests, and synthetic existing-profile preservation passed in [qualification run 39056342294](https://github.com/ateam54321/MTG-Deck-Builder/actions/runs/39056342294). [Public publishing and release file checksum verification](https://github.com/ateam54321/Commander-Lab-Releases/actions/runs/39057164571) also succeeded.
 
-For existing installations, use **Settings → Check for Updates** or run the installer above. Back up important local collections, saved decks, and settings before updating. The unsigned installer may show a Microsoft SmartScreen warning. No personal collection, saved deck, credential or protected allocation is bundled in the release.
+To update an existing installation, open **Commander Lab → Settings → Check for Updates** and install **Beta 0.1.27**. If unavailable, use the installer linked above. Back up important local collections, saved decks, and settings before updating. The unsigned installer may trigger Microsoft SmartScreen. No personal collection or credentials are included.
 
 ## Previous releases
 
-Older releases remain accessible from the [Releases page](https://github.com/ateam54321/Commander-Lab-Releases/releases). Public tags and binaries are immutable and never overwritten.
+Prior beta versions remain available on the [Releases page](https://github.com/ateam54321/Commander-Lab-Releases/releases). Published binaries and tags are never overwritten.
